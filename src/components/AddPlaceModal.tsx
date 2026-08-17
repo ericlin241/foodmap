@@ -5,6 +5,7 @@ import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
 import {
   extractCoordsFromUrl,
   extractPlaceNameFromUrl,
+  cleanAndValidatePlaceName,
   resolveGoogleMapsShortlink,
   geocodePlace,
   parseAddressToCityDistrict,
@@ -125,10 +126,11 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       sourceName?: string,
       detectedStoreName?: string
     ) => {
-      // Auto-fill Store Name if currently empty
-      if (detectedStoreName && !name.trim()) {
-        setName(detectedStoreName);
-        setAutoDetectedName(detectedStoreName);
+      // Auto-fill Store Name if currently empty and valid
+      const cleanName = cleanAndValidatePlaceName(detectedStoreName);
+      if (cleanName && !name.trim()) {
+        setName(cleanName);
+        setAutoDetectedName(cleanName);
       }
 
       let detected: { city: string; district: string } | null = null;

@@ -15,31 +15,84 @@ export const onRequestGet: PagesFunction = async (context) => {
       });
     }
 
+    // Helper to clean and validate place names (never return internal tokens, data=, hex IDs, or raw coords)
+    const cleanAndValidatePlaceName = (raw: string | null | undefined): string | null => {
+      if (!raw || typeof raw !== 'string') return null;
+      let str = raw.trim();
+
+      // Multi-pass safe URL decoding
+      for (let i = 0; i < 3; i++) {
+        if (/%[0-9a-fA-F]{2}/.test(str)) {
+          try {
+            str = decodeURIComponent(str);
+          } catch {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+
+      // Remove trailing query params or hash
+      str = str.replace(/[?#].*$/, '');
+      // Remove trailing @lat,lng coordinates if appended
+      str = str.replace(/@[-0-9.,]+.*$/, '');
+      // Remove data= or !3m parameters if present
+      str = str.replace(/\/data=.*$/, '');
+      str = str.replace(/\+/g, ' ').trim();
+
+      // Filter out invalid names / internal tokens / garbled fragments
+      if (!str) return null;
+      if (/^data=!/i.test(str)) return null;
+      if (/^!/i.test(str)) return null;
+      if (/^0x[0-9a-f]+:0x[0-9a-f]+$/i.test(str)) return null;
+      if (/^0x[0-9a-f]+$/i.test(str)) return null;
+      if (/^ChIJ[a-zA-Z0-9_-]+$/i.test(str)) return null;
+      if (/^-?\d{1,2}\.\d+,-?\d{2,3}\.\d+$/.test(str)) return null;
+      if (/^(maps|preview|search|place|dir|viewer|timeline|sorry|consent)$/i.test(str)) return null;
+      if (str.length < 1 || str.length > 80) return null;
+
+      return str;
+    };
+
     // Helper to extract clean place name from URL
     const extractNameFromUrl = (urlStr: string): string | null => {
       if (!urlStr) return null;
       try {
-        const decoded = decodeURIComponent(urlStr);
+        let decoded = urlStr.trim();
+        for (let i = 0; i < 3; i++) {
+          if (/%[0-9a-fA-F]{2}/.test(decoded)) {
+            try {
+              decoded = decodeURIComponent(decoded);
+            } catch {
+              break;
+            }
+          } else {
+            break;
+          }
+        }
+
         // 1. /maps/place/<Name>
         const placeMatch = decoded.match(/\/maps\/place\/([^\/@?#]+)/i);
         if (placeMatch && placeMatch[1]) {
-          const n = placeMatch[1].replace(/\+/g, ' ').trim();
-          if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) return n;
+          const valid = cleanAndValidatePlaceName(placeMatch[1]);
+          if (valid) return valid;
         }
+
         // 2. /maps/search/<Name>
         const searchMatch = decoded.match(/\/maps\/search\/([^\/@?#]+)/i);
         if (searchMatch && searchMatch[1]) {
-          const n = searchMatch[1].replace(/\+/g, ' ').trim();
-          if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) return n;
+          const valid = cleanAndValidatePlaceName(searchMatch[1]);
+          if (valid) return valid;
         }
+
         // 3. Query param ?q=<Name> or ?query=<Name>
         const qMatch = decoded.match(/[?&](?:q|query)=([^&]+)/i);
         if (qMatch && qMatch[1]) {
-          const n = qMatch[1].replace(/\+/g, ' ').trim();
-          if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) {
-            // Split out city/district if present in query like "阿堂鹹粥 台南市 中西區"
-            const parts = n.split(/\s+/);
-            return parts[0] || n;
+          const valid = cleanAndValidatePlaceName(qMatch[1]);
+          if (valid) {
+            const parts = valid.split(/\s+/);
+            return parts[0] || valid;
           }
         }
       } catch {
@@ -155,7 +208,7 @@ export const onRequestGet: PagesFunction = async (context) => {
     }
 
     // If not found in URL, search Google Maps preview/place endpoint in HTML
-    if (!lat || !lng) {
+    if (!lat || !lng || !extractedName) {
       const previewMatch = text.match(/\/maps\/preview\/place\?([^"'>\s]+)/i) || text.match(/pb=([^"'>\s]+)/i);
       if (previewMatch) {
         let rawQuery = previewMatch[0].replace(/&amp;/g, '&');
@@ -172,14 +225,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         if (!extractedName) {
           const qParam = pUrl.match(/[?&]q=([^&]+)/);
           if (qParam) {
-            try {
-              const decodedQ = decodeURIComponent(qParam[1]).replace(/\+/g, ' ').trim();
-              if (!decodedQ.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) {
-                extractedName = decodedQ;
-              }
-            } catch {
-              // ignore
-            }
+            extractedName = cleanAndValidatePlaceName(qParam[1]);
           }
         }
 
@@ -192,6 +238,15 @@ export const onRequestGet: PagesFunction = async (context) => {
           });
           if (pRes.ok) {
             const pText = await pRes.text();
+
+            // Extract place name after CID in JSON (e.g. "0x3442...:0xff58...","六小時麵包店")
+            if (!extractedName) {
+              const nameAfterCidMatch = pText.match(/"0x[0-9a-f]+:0x[0-9a-f]+"\s*,\s*"([^"]+)"/i);
+              if (nameAfterCidMatch && nameAfterCidMatch[1]) {
+                const validName = cleanAndValidatePlaceName(nameAfterCidMatch[1]);
+                if (validName) extractedName = validName;
+              }
+            }
 
             // Extract address if available (e.g. ["112臺北市北投區尊賢里尊賢街218巷23弄12號"])
             const addrMatch = pText.match(/\["(\d{3,5}[\u4e00-\u9fa50-9號巷弄路街段里村鄰市縣區鄉鎮\- ]+?)"\]/) ||
@@ -271,7 +326,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         finalUrl,
         latitude: lat,
         longitude: lng,
-        name: extractedName,
+        name: cleanAndValidatePlaceName(extractedName),
         address,
         source: matchSource,
       }),

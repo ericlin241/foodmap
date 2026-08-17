@@ -16,34 +16,88 @@ function getApiUrl(path: string) {
 }
 
 /**
+ * Clean and strictly validate place name (never return raw coords, data= params, hex CID, or internal tokens)
+ */
+export function cleanAndValidatePlaceName(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== 'string') return null;
+  let str = raw.trim();
+
+  // Multi-pass safe URL decoding
+  for (let i = 0; i < 3; i++) {
+    if (/%[0-9a-fA-F]{2}/.test(str)) {
+      try {
+        str = decodeURIComponent(str);
+      } catch {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  // Remove trailing query params or hash
+  str = str.replace(/[?#].*$/, '');
+  // Remove trailing @lat,lng coordinates if appended
+  str = str.replace(/@[-0-9.,]+.*$/, '');
+  // Remove data= or !3m parameters if present
+  str = str.replace(/\/data=.*$/, '');
+  str = str.replace(/\+/g, ' ').trim();
+
+  // Filter out invalid names / internal tokens / garbled fragments
+  if (!str) return null;
+  if (/^data=!/i.test(str)) return null;
+  if (/^!/i.test(str)) return null;
+  if (/^0x[0-9a-f]+:0x[0-9a-f]+$/i.test(str)) return null;
+  if (/^0x[0-9a-f]+$/i.test(str)) return null;
+  if (/^ChIJ[a-zA-Z0-9_-]+$/i.test(str)) return null;
+  if (/^-?\d{1,2}\.\d+,-?\d{2,3}\.\d+$/.test(str)) return null;
+  if (/^(maps|preview|search|place|dir|viewer|timeline|sorry|consent)$/i.test(str)) return null;
+  if (str.length < 1 || str.length > 80) return null;
+
+  return str;
+}
+
+/**
  * Extract Place/Store Name from Google Maps URL
  */
 export function extractPlaceNameFromUrl(rawInput: string): string | null {
   if (!rawInput || !rawInput.trim()) return null;
 
   try {
-    const decoded = decodeURIComponent(rawInput.trim());
+    let decoded = rawInput.trim();
+    for (let i = 0; i < 3; i++) {
+      if (/%[0-9a-fA-F]{2}/.test(decoded)) {
+        try {
+          decoded = decodeURIComponent(decoded);
+        } catch {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
     // 1. /maps/place/<Name>
     const placeMatch = decoded.match(/\/maps\/place\/([^\/@?#]+)/i);
     if (placeMatch && placeMatch[1]) {
-      const n = placeMatch[1].replace(/\+/g, ' ').trim();
-      if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) return n;
+      const valid = cleanAndValidatePlaceName(placeMatch[1]);
+      if (valid) return valid;
     }
 
     // 2. /maps/search/<Name>
     const searchMatch = decoded.match(/\/maps\/search\/([^\/@?#]+)/i);
     if (searchMatch && searchMatch[1]) {
-      const n = searchMatch[1].replace(/\+/g, ' ').trim();
-      if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) return n;
+      const valid = cleanAndValidatePlaceName(searchMatch[1]);
+      if (valid) return valid;
     }
 
     // 3. Query param ?q=<Name> or ?query=<Name>
     const qMatch = decoded.match(/[?&](?:q|query)=([^&]+)/i);
     if (qMatch && qMatch[1]) {
-      const n = qMatch[1].replace(/\+/g, ' ').trim();
-      if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) {
-        const parts = n.split(/\s+/);
-        return parts[0] || n;
+      const valid = cleanAndValidatePlaceName(qMatch[1]);
+      if (valid) {
+        const parts = valid.split(/\s+/);
+        return parts[0] || valid;
       }
     }
   } catch {
@@ -142,7 +196,7 @@ export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ l
           lng: data.longitude,
           source: data.source || '雲端精準解析',
           address: data.address || undefined,
-          name: data.name || undefined,
+          name: cleanAndValidatePlaceName(data.name) || undefined,
         };
       }
     }
