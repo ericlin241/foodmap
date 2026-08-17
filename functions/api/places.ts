@@ -2,6 +2,21 @@ interface Env {
   DB: D1Database;
 }
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+  'Access-Control-Max-Age': '86400',
+};
+
+// OPTIONS: Handle CORS Preflight for cross-domain requests (GitHub Pages -> Cloudflare)
+export const onRequestOptions: PagesFunction = async () => {
+  return new Response(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+};
+
 // GET: 查詢所有美食地點
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
@@ -9,7 +24,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     if (!env.DB) {
       return new Response(JSON.stringify({ error: 'D1 Database not bound' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
 
@@ -17,7 +32,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       'SELECT * FROM places ORDER BY created_at DESC'
     ).all();
 
-    // Map backwards compatibility if needed
     const places = (results || []).map((row: any) => ({
       id: row.id,
       name: row.name,
@@ -36,13 +50,14 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return new Response(JSON.stringify(places), {
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        ...CORS_HEADERS,
       },
     });
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
   }
 };
@@ -54,7 +69,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (!env.DB) {
       return new Response(JSON.stringify({ error: 'D1 Database not bound' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
 
@@ -76,16 +91,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (!name || !food_url || !city) {
       return new Response(JSON.stringify({ error: 'Missing required fields (name, food_url, city)' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
 
-    // Support both old and new schema
     await env.DB.prepare(
-      `INSERT INTO places (id, name, url, image_url, city, district, category, note, latitude, longitude, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO places (id, name, url, food_url, map_url, image_url, city, district, category, note, latitude, longitude, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(id, name, food_url, image_url, city, district, category, note, latitude, longitude, created_at)
+      .bind(id, name, food_url, food_url, map_url, image_url, city, district, category, note, latitude, longitude, created_at)
       .run();
 
     return new Response(
@@ -94,14 +108,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         status: 201,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          ...CORS_HEADERS,
         },
       }
     );
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
   }
 };
@@ -113,7 +127,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     if (!env.DB) {
       return new Response(JSON.stringify({ error: 'D1 Database not bound' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
 
@@ -122,12 +136,13 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     if (!id) {
       return new Response(JSON.stringify({ error: 'Place ID is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
 
     const name = data.name;
     const food_url = data.food_url || '';
+    const map_url = data.map_url || '';
     const image_url = data.image_url || '';
     const city = data.city || '';
     const district = data.district || '';
@@ -138,10 +153,10 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
 
     await env.DB.prepare(
       `UPDATE places 
-       SET name = ?, url = ?, image_url = ?, city = ?, district = ?, category = ?, note = ?, latitude = ?, longitude = ?
+       SET name = ?, url = ?, food_url = ?, map_url = ?, image_url = ?, city = ?, district = ?, category = ?, note = ?, latitude = ?, longitude = ?
        WHERE id = ?`
     )
-      .bind(name, food_url, image_url, city, district, category, note, latitude, longitude, id)
+      .bind(name, food_url, food_url, map_url, image_url, city, district, category, note, latitude, longitude, id)
       .run();
 
     return new Response(
@@ -149,14 +164,14 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          ...CORS_HEADERS,
         },
       }
     );
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
   }
 };
@@ -168,7 +183,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     if (!env.DB) {
       return new Response(JSON.stringify({ error: 'D1 Database not bound' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
 
@@ -178,7 +193,7 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     if (!id) {
       return new Response(JSON.stringify({ error: 'ID is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
       });
     }
 
@@ -187,13 +202,13 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     return new Response(JSON.stringify({ success: true, message: 'Place deleted' }), {
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...CORS_HEADERS,
       },
     });
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
   }
 };
