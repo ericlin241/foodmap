@@ -1,42 +1,40 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Header } from './components/Header';
-import { FilterBar } from './components/FilterBar';
-import { PlaceCard } from './components/PlaceCard';
-import { MapView } from './components/MapView';
-import { AddPlaceModal } from './components/AddPlaceModal';
-import { RandomWheel } from './components/RandomWheel';
-import { StatsModal } from './components/StatsModal';
-import { usePlaces } from './hooks/usePlaces';
 import { Place } from './types';
-import { TAIWAN_LOCATIONS } from './data/taiwanDistricts';
+import { usePlaces } from './hooks/usePlaces';
+import { MapView } from './components/MapView';
+import { PlaceCard } from './components/PlaceCard';
+import { FilterBar } from './components/FilterBar';
+import { AddPlaceModal } from './components/AddPlaceModal';
+import { RandomWheel as WheelModal } from './components/RandomWheel';
+import { StatsModal } from './components/StatsModal';
+import { Header } from './components/Header';
 import { Map, List, Plus, AlertCircle } from 'lucide-react';
+import { TAIWAN_LOCATIONS } from './data/taiwanDistricts';
 
-export function App() {
-  const {
-    places,
-    loading,
-    addPlace,
-    updatePlace,
-    deletePlace,
-  } = usePlaces();
+export default function App() {
+  const { places, loading, addPlace, updatePlace, deletePlace } = usePlaces();
 
-  // Filters
-  const [selectedCity, setSelectedCity] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [searchKeyword, setSearchKeyword] = useState('');
-
-  // UI state (手機版預設載入清單檢視畫面)
-  const [mobileTab, setMobileTab] = useState<'map' | 'list'>('list');
+  // Selected State
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
-  const [noMapAlert, setNoMapAlert] = useState<string | null>(null);
-  const alertTimerRef = useRef<any>(null);
+  const [editingPlace, setEditingPlace] = useState<Place | null>(null);
+
+  // Filters State
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [searchKeyword, setSearchKeyword] = useState<string>('');
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingPlace, setEditingPlace] = useState<Place | null>(null);
   const [isWheelModalOpen, setIsWheelModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+
+  // Mobile View Switch: 'map' | 'list'
+  const [mobileTab, setMobileTab] = useState<'map' | 'list'>('list');
+
+  // Alert for places without map URL (temporary 3-second floating toast)
+  const [noMapAlert, setNoMapAlert] = useState<string | null>(null);
+  const alertTimerRef = useRef<any>(null);
 
   // Center position for map based on filter selection
   const mapCenterPosition = useMemo(() => {
@@ -136,7 +134,7 @@ export function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100 font-sans">
+    <div className="flex flex-col h-screen h-[100dvh] min-h-[100dvh] max-h-[100dvh] w-screen overflow-hidden bg-slate-100 font-sans">
       {/* 頂部導航列 */}
       <Header
         onOpenAddModal={handleOpenAddModal}
@@ -220,12 +218,13 @@ export function App() {
             onEditPlace={handleOpenEditModal}
             centerPosition={mapCenterPosition}
             noMapAlert={noMapAlert}
+            mobileTab={mobileTab}
           />
         </main>
       </div>
 
-      {/* 手機版底部導航與懸浮切換列 (上移並自適應 iPhone Safari 網址列與安全區) */}
-      <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-slate-200 pt-2 px-4 pb-4 sm:pb-5 safe-area-bottom flex items-center justify-around z-30 shadow-2xl">
+      {/* 手機版底部導航與懸浮切換列 (自適應 iPhone Safari / Android 網址列與安全區，絕不被遮擋) */}
+      <div className="md:hidden bg-white/98 backdrop-blur-md border-t border-slate-200/90 pt-2.5 px-4 safe-area-bottom flex items-center justify-around z-40 shadow-[0_-8px_25px_rgba(0,0,0,0.08)] shrink-0 select-none">
         {/* 切換為地圖模式 */}
         <button
           id="btn-mobile-tab-map"
@@ -272,17 +271,15 @@ export function App() {
         initialData={editingPlace}
       />
 
-      {/* 隨機美食轉盤抽籤彈窗 */}
-      <RandomWheel
+      {/* 命運美食轉盤抽籤彈窗 */}
+      <WheelModal
         isOpen={isWheelModalOpen}
         onClose={() => setIsWheelModalOpen(false)}
         places={wheelCandidatePlaces}
-        selectedCity={selectedCity}
-        selectedDistrict={selectedDistrict}
         onSelectPlace={handleSelectPlace}
       />
 
-      {/* 統計資訊彈窗 */}
+      {/* 美食地圖收藏統計儀表板 */}
       <StatsModal
         isOpen={isStatsModalOpen}
         onClose={() => setIsStatsModalOpen(false)}
@@ -291,4 +288,3 @@ export function App() {
     </div>
   );
 }
-export default App;

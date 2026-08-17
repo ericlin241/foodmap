@@ -66,17 +66,19 @@ const createCustomIcon = (isSelected: boolean) => {
   });
 };
 
-// Component to handle smooth flyTo and exact map centering (only runs on selection change, no snapping on zoom/pan)
+// Component to handle smooth flyTo and exact map centering (only runs on selection change or mobile tab switch)
 function MapFlyController({
   selectedPlace,
   centerPosition,
   mapPlaces,
   cardElementRef,
+  mobileTab,
 }: {
   selectedPlace: Place | null;
   centerPosition?: { lat: number; lng: number; zoom?: number } | null;
   mapPlaces: Place[];
   cardElementRef: React.RefObject<HTMLDivElement>;
+  mobileTab?: 'map' | 'list';
 }) {
   const map = useMap();
   const lastSelectedPlaceIdRef = useRef<string | null>(null);
@@ -107,6 +109,65 @@ function MapFlyController({
     }
   };
 
+  // Core function to fly to selected place and center between floating card bottom and bottom nav bar top
+  const flyToSelectedPlace = () => {
+    if (!selectedPlace) return;
+    const latNum = Number(selectedPlace.latitude);
+    const lngNum = Number(selectedPlace.longitude);
+    if (isNaN(latNum) || !latNum || isNaN(lngNum) || !lngNum) return;
+
+    const isMobile = window.innerWidth < 768;
+    const zoomLevel = 16;
+    const targetLatLng = L.latLng(latNum, lngNum);
+
+    try {
+      map.invalidateSize();
+
+      if (isMobile) {
+        // Requirement 3: 手機網頁瀏覽圖釘應要在圖卡最下面與最下面的最上面之間的中間
+        const cardElem = cardElementRef.current || document.getElementById('selected-place-floating-card');
+        let cardBottom = 340;
+        if (cardElem) {
+          const rect = cardElem.getBoundingClientRect();
+          if (rect.height > 100 && rect.bottom > 150) {
+            cardBottom = rect.bottom;
+          }
+        }
+        const navElem = document.querySelector('.safe-area-bottom');
+        const navTop = navElem ? navElem.getBoundingClientRect().top : (window.innerHeight - 80);
+
+        const targetScreenY = (cardBottom + navTop) / 2;
+        const screenCenterY = window.innerHeight / 2;
+        const offsetY = targetScreenY - screenCenterY;
+
+        const point = map.project(targetLatLng, zoomLevel);
+        if (!isNaN(point.x) && !isNaN(point.y) && !isNaN(offsetY)) {
+          const offsetPoint = L.point(point.x, point.y - offsetY);
+          const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
+          if (!isNaN(offsetLatLng.lat) && !isNaN(offsetLatLng.lng)) {
+            map.flyTo(offsetLatLng, zoomLevel, { animate: true, duration: 0.8 });
+            return;
+          }
+        }
+        map.flyTo(targetLatLng, zoomLevel, { animate: true, duration: 0.8 });
+      } else {
+        // Requirement 4: 電腦網頁圖釘不要置中 偏左下一點（向左 120px，向下 80px）
+        const point = map.project(targetLatLng, zoomLevel);
+        if (!isNaN(point.x) && !isNaN(point.y)) {
+          const offsetPoint = L.point(point.x + 120, point.y - 80);
+          const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
+          if (!isNaN(offsetLatLng.lat) && !isNaN(offsetLatLng.lng)) {
+            map.flyTo(offsetLatLng, zoomLevel, { animate: true, duration: 0.8 });
+            return;
+          }
+        }
+        map.flyTo(targetLatLng, zoomLevel, { animate: true, duration: 0.8 });
+      }
+    } catch (err) {
+      console.warn('flyToSelectedPlace error:', err);
+    }
+  };
+
   // Periodically and on visibility change check if pending actions can be run
   useEffect(() => {
     const handleCheckVisibility = () => {
@@ -125,22 +186,9 @@ function MapFlyController({
     };
 
     handleCheckVisibility();
-
-    // Check periodically to catch tab switches on mobile
-    const interval = setInterval(handleCheckVisibility, 300);
+    const interval = setInterval(handleCheckVisibility, 200);
     return () => clearInterval(interval);
   }, [map]);
-
-  // Invalidate map size whenever selection or visibility might have changed
-  useEffect(() => {
-    if (isMapContainerVisible()) {
-      try {
-        map.invalidateSize();
-      } catch {
-        // ignore
-      }
-    }
-  }, [map, selectedPlace]);
 
   // Handle selected place positioning (Only once per selection change; does not reset on zoom/pan)
   useEffect(() => {
@@ -158,60 +206,26 @@ function MapFlyController({
       }
       lastSelectedPlaceIdRef.current = selectedPlace.id;
 
-      const isMobile = window.innerWidth < 768;
-      const zoomLevel = 16;
-      const latNum = Number(selectedPlace.latitude);
-      const lngNum = Number(selectedPlace.longitude);
-
-      if (isNaN(latNum) || isNaN(lngNum)) return;
-
-      const targetLatLng = L.latLng(latNum, lngNum);
-
       safelyExecute(() => {
+        // Delay slightly for DOM layout & tab transition to settle
         setTimeout(() => {
-          if (!isMapContainerVisible()) return;
-          map.invalidateSize();
-
-          if (isMobile) {
-            // Requirement 3: 手機網頁瀏覽圖釘應要在圖卡最下面與最下面的最上面之間的中間
-            const cardElem = cardElementRef.current || document.getElementById('selected-place-floating-card');
-            const cardBottom = cardElem ? cardElem.getBoundingClientRect().bottom : 300;
-            const navElem = document.querySelector('.safe-area-bottom');
-            const navTop = navElem ? navElem.getBoundingClientRect().top : (window.innerHeight - 70);
-
-            const targetScreenY = (cardBottom + navTop) / 2;
-            const screenCenterY = window.innerHeight / 2;
-            const offsetY = targetScreenY - screenCenterY;
-
-            const point = map.project(targetLatLng, zoomLevel);
-            if (!isNaN(point.x) && !isNaN(point.y) && !isNaN(offsetY)) {
-              const offsetPoint = L.point(point.x, point.y - offsetY);
-              const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
-              if (!isNaN(offsetLatLng.lat) && !isNaN(offsetLatLng.lng)) {
-                map.flyTo(offsetLatLng, zoomLevel, { animate: true, duration: 0.8 });
-                return;
-              }
-            }
-            map.flyTo(targetLatLng, zoomLevel, { animate: true, duration: 0.8 });
-          } else {
-            // Requirement 4: 電腦網頁圖釘不要置中 偏左下一點（目前位置的左下角移動一點點）
-            const point = map.project(targetLatLng, zoomLevel);
-            if (!isNaN(point.x) && !isNaN(point.y)) {
-              const offsetPoint = L.point(point.x + 120, point.y - 80);
-              const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
-              if (!isNaN(offsetLatLng.lat) && !isNaN(offsetLatLng.lng)) {
-                map.flyTo(offsetLatLng, zoomLevel, { animate: true, duration: 0.8 });
-                return;
-              }
-            }
-            map.flyTo(targetLatLng, zoomLevel, { animate: true, duration: 0.8 });
-          }
-        }, 60);
+          flyToSelectedPlace();
+        }, 120);
       });
     } else {
       lastSelectedPlaceIdRef.current = null;
     }
   }, [selectedPlace, map, cardElementRef]);
+
+  // When switching to map tab on mobile, automatically fly to selected place if active
+  useEffect(() => {
+    if (mobileTab === 'map' && selectedPlace) {
+      const timer = setTimeout(() => {
+        safelyExecute(flyToSelectedPlace);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [mobileTab, selectedPlace]);
 
   // Handle explicit filter center position change (e.g. user selected city/district filter)
   useEffect(() => {
@@ -264,6 +278,7 @@ interface MapViewProps {
   onEditPlace?: (place: Place) => void;
   centerPosition?: { lat: number; lng: number; zoom?: number } | null;
   noMapAlert: string | null;
+  mobileTab?: 'map' | 'list';
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -273,6 +288,7 @@ export const MapView: React.FC<MapViewProps> = ({
   onEditPlace,
   centerPosition,
   noMapAlert,
+  mobileTab,
 }) => {
   const defaultCenter = { lat: 23.9738, lng: 120.982, zoom: 8 };
   const [copied, setCopied] = useState(false);
@@ -342,6 +358,7 @@ export const MapView: React.FC<MapViewProps> = ({
             centerPosition={centerPosition}
             mapPlaces={mapPlaces}
             cardElementRef={cardElementRef}
+            mobileTab={mobileTab}
           />
 
           {/* Places Markers (所有具備座標的地點常駐顯示，選取者放大跳動) */}
