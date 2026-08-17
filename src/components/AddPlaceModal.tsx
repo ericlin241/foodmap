@@ -320,10 +320,10 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             />
           </div>
 
-          {/* 美食連結 (必填) */}
+          {/* 美食連結 */}
           <div>
             <label className="block font-bold text-slate-800 mb-1 text-sm">
-              美食連結 (食記／IG／短影片／文章介紹) <span className="text-orange-600">* (必填)</span>
+              美食連結 (食記／IG／短影片／文章介紹) <span className="text-orange-600">*</span>
             </label>
             <div className="relative">
               <input
