@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, AlertCircle, Utensils, Check } from 'lucide-react';
+import { X, MapPin, AlertCircle, Utensils, Check, Edit2 } from 'lucide-react';
 import { Place } from '../types';
 import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
 import { extractCoordsFromUrl, resolveGoogleMapsShortlink, geocodePlace } from '../utils/geocoding';
@@ -34,6 +34,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
   const [showCoordInput, setShowCoordInput] = useState(false);
   const [resolvingMap, setResolvingMap] = useState(false);
   const [coordSuccessMsg, setCoordSuccessMsg] = useState<string | null>(null);
+  const [coordWarnMsg, setCoordWarnMsg] = useState<string | null>(null);
 
   // Real-time thumbnail preview
   const [previewImage, setPreviewImage] = useState<string>('');
@@ -51,10 +52,17 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       setCategory(initialData.category || '經典小吃');
       setNote(initialData.note || '');
       setPreviewImage(initialData.image_url || '');
-      if (initialData.latitude !== null && initialData.longitude !== null && initialData.latitude !== undefined && initialData.longitude !== undefined) {
+      if (
+        initialData.latitude !== null &&
+        initialData.longitude !== null &&
+        initialData.latitude !== undefined &&
+        initialData.longitude !== undefined &&
+        !isNaN(Number(initialData.latitude)) &&
+        !isNaN(Number(initialData.longitude))
+      ) {
         setCustomLat(String(initialData.latitude));
         setCustomLng(String(initialData.longitude));
-        setCoordSuccessMsg(`已設定精確座標 (${Number(initialData.latitude).toFixed(5)}, ${Number(initialData.longitude).toFixed(5)})`);
+        setCoordSuccessMsg(`已設定店家圖釘座標 (${Number(initialData.latitude).toFixed(5)}, ${Number(initialData.longitude).toFixed(5)})`);
       } else {
         setCustomLat('');
         setCustomLng('');
@@ -74,40 +82,49 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       setCoordSuccessMsg(null);
     }
     setError(null);
+    setCoordWarnMsg(null);
     setShowCoordInput(false);
   }, [initialData, isOpen]);
 
   // Trigger coordinate resolution when Map URL or Name/City/District changes
-  const autoResolveCoordinates = async (urlStr: string, storeName: string, cityName: string, distName: string) => {
-    if (!urlStr.trim()) {
+  const autoResolveCoordinates = async (rawUrlStr: string, storeName: string, cityName: string, distName: string) => {
+    if (!rawUrlStr.trim()) {
+      setCustomLat('');
+      setCustomLng('');
       setCoordSuccessMsg(null);
+      setCoordWarnMsg(null);
       return;
     }
 
     setResolvingMap(true);
     setCoordSuccessMsg(null);
+    setCoordWarnMsg(null);
 
-    // 1. Direct Regex from URL
-    const directCoords = extractCoordsFromUrl(urlStr.trim());
+    // Extract clean URL from raw text
+    const urlMatch = rawUrlStr.match(/https?:\/\/[^\s"'<>]+/i);
+    const cleanUrl = urlMatch ? urlMatch[0] : rawUrlStr.trim();
+
+    // 1. Direct Regex from URL / Raw Coordinates
+    const directCoords = extractCoordsFromUrl(cleanUrl);
     if (directCoords) {
       setCustomLat(String(directCoords.lat));
       setCustomLng(String(directCoords.lng));
-      setCoordSuccessMsg(`網址精準提取 (${directCoords.lat.toFixed(5)}, ${directCoords.lng.toFixed(5)})`);
+      setCoordSuccessMsg(`已取得圖釘座標 (${directCoords.lat.toFixed(5)}, ${directCoords.lng.toFixed(5)}) [${directCoords.source || '網址提取'}]`);
       setResolvingMap(false);
       return;
     }
 
-    // 2. Server-side deep resolver backend (Follows redirects, parses HTML /preview/place pb & staticmap pins)
-    const resolved = await resolveGoogleMapsShortlink(urlStr.trim());
-    if (resolved) {
+    // 2. Server-side deep resolver (Follows redirects, parses HTML /preview/place pb & exact place pins)
+    const resolved = await resolveGoogleMapsShortlink(cleanUrl);
+    if (resolved && resolved.lat && resolved.lng) {
       setCustomLat(String(resolved.lat));
       setCustomLng(String(resolved.lng));
-      setCoordSuccessMsg(`地標精準定位 (${resolved.lat.toFixed(5)}, ${resolved.lng.toFixed(5)})`);
+      setCoordSuccessMsg(`已取得 Google 地圖圖釘座標 (${resolved.lat.toFixed(5)}, ${resolved.lng.toFixed(5)})`);
       setResolvingMap(false);
       return;
     }
 
-    // 3. High-precision Geocoding
+    // 3. High-precision Geocoding fallback by Store Name
     if (storeName.trim()) {
       const geo = await geocodePlace(storeName.trim(), cityName, distName);
       if (geo) {
@@ -119,14 +136,10 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       }
     }
 
-    // 4. Fallback to district center
-    const cityData = TAIWAN_LOCATIONS.find((c) => c.city === cityName);
-    const distData = cityData?.districts.find((d) => d.name === distName);
-    const fallbackLat = distData?.lat || cityData?.lat || 25.0375;
-    const fallbackLng = distData?.lng || cityData?.lng || 121.5637;
-    setCustomLat(String(fallbackLat));
-    setCustomLng(String(fallbackLng));
-    setCoordSuccessMsg(`已對齊行政區中心 (${fallbackLat.toFixed(4)}, ${fallbackLng.toFixed(4)})`);
+    // Never fallback to district center! Leave coordinates empty and inform user
+    setCustomLat('');
+    setCustomLng('');
+    setCoordWarnMsg('未能自動讀取精確圖釘座標，可展開下方手動輸入經緯度');
     setResolvingMap(false);
   };
 
@@ -155,7 +168,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     }
   };
 
-  // Live Fetch OpenGraph Thumbnail from Food URL (Linklook style)
+  // Live Fetch OpenGraph Thumbnail from Food URL
   const handleFoodUrlChange = async (urlStr: string, cat: string) => {
     setFoodUrl(urlStr);
     if (!urlStr.trim()) {
@@ -191,31 +204,24 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     let finalLat: number | null = null;
     let finalLng: number | null = null;
 
-    if (mapUrl.trim()) {
-      if (customLat && customLng && !isNaN(Number(customLat)) && !isNaN(Number(customLng))) {
-        finalLat = Number(customLat);
-        finalLng = Number(customLng);
+    if (customLat && customLng && !isNaN(Number(customLat)) && !isNaN(Number(customLng))) {
+      finalLat = Number(customLat);
+      finalLng = Number(customLng);
+    } else if (mapUrl.trim()) {
+      const direct = extractCoordsFromUrl(mapUrl.trim());
+      if (direct) {
+        finalLat = direct.lat;
+        finalLng = direct.lng;
       } else {
-        const direct = extractCoordsFromUrl(mapUrl.trim());
-        if (direct) {
-          finalLat = direct.lat;
-          finalLng = direct.lng;
+        const resolved = await resolveGoogleMapsShortlink(mapUrl.trim());
+        if (resolved && resolved.lat && resolved.lng) {
+          finalLat = resolved.lat;
+          finalLng = resolved.lng;
         } else {
-          const resolved = await resolveGoogleMapsShortlink(mapUrl.trim());
-          if (resolved) {
-            finalLat = resolved.lat;
-            finalLng = resolved.lng;
-          } else {
-            const geo = await geocodePlace(name.trim(), city, district);
-            if (geo) {
-              finalLat = geo.lat;
-              finalLng = geo.lng;
-            } else {
-              const cityData = TAIWAN_LOCATIONS.find((c) => c.city === city);
-              const distData = cityData?.districts.find((d) => d.name === district);
-              finalLat = distData?.lat || cityData?.lat || 25.0375;
-              finalLng = distData?.lng || cityData?.lng || 121.5637;
-            }
+          const geo = await geocodePlace(name.trim(), city, district);
+          if (geo) {
+            finalLat = geo.lat;
+            finalLng = geo.lng;
           }
         }
       }
@@ -364,15 +370,25 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
 
           {/* Google 地圖連結 (非必填) */}
           <div>
-            <label className="block font-bold text-slate-800 mb-1 text-sm">
-              Google 地圖連結 <span className="text-slate-400 font-normal">(選填，若無填寫則僅在清單顯示)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block font-bold text-slate-800 text-sm">
+                Google 地圖連結 <span className="text-slate-400 font-normal">(選填，支援所有格式)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowCoordInput(!showCoordInput)}
+                className="text-[11px] text-slate-500 hover:text-orange-600 flex items-center gap-1 font-medium transition-colors"
+              >
+                <Edit2 className="w-3 h-3" />
+                <span>{showCoordInput ? '隱藏座標' : '進階座標'}</span>
+              </button>
+            </div>
             <div className="relative">
               <input
-                type="url"
+                type="text"
                 value={mapUrl}
                 onChange={(e) => handleMapUrlChange(e.target.value)}
-                placeholder="https://maps.app.goo.gl/... 或 Google Maps 連結"
+                placeholder="https://maps.app.goo.gl/... 或 Google Maps 分享連結"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm"
               />
               <MapPin className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -382,7 +398,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             {resolvingMap && (
               <p className="text-[11px] text-orange-600 font-semibold mt-1.5 flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                正在自動定位 Google 地圖店家精準座標...
+                正在自動解析 Google 地圖圖釘精確座標...
               </p>
             )}
             {coordSuccessMsg && !resolvingMap && (
@@ -390,6 +406,50 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
                 <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
                 {coordSuccessMsg}
               </p>
+            )}
+            {coordWarnMsg && !resolvingMap && (
+              <p className="text-[11px] text-amber-700 font-medium mt-1.5 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 stroke-[2]" />
+                {coordWarnMsg}
+              </p>
+            )}
+
+            {/* 手動輸入 / 檢視經緯度 */}
+            {showCoordInput && (
+              <div className="mt-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-2 gap-2 animate-in fade-in duration-150">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">緯度 (Latitude)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={customLat}
+                    onChange={(e) => {
+                      setCustomLat(e.target.value);
+                      if (e.target.value && customLng) {
+                        setCoordSuccessMsg(`自訂座標 (${Number(e.target.value).toFixed(5)}, ${Number(customLng).toFixed(5)})`);
+                      }
+                    }}
+                    placeholder="25.03396"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1">經度 (Longitude)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={customLng}
+                    onChange={(e) => {
+                      setCustomLng(e.target.value);
+                      if (customLat && e.target.value) {
+                        setCoordSuccessMsg(`自訂座標 (${Number(customLat).toFixed(5)}, ${Number(e.target.value).toFixed(5)})`);
+                      }
+                    }}
+                    placeholder="121.56447"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                  />
+                </div>
+              </div>
             )}
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Place } from '../types';
@@ -32,48 +32,99 @@ const createCustomIcon = (isSelected: boolean) => {
   });
 };
 
-// Component to handle smooth flyTo and exact map centering
+// Component to handle smooth flyTo and exact map centering (only runs on selection change, no snapping on zoom/pan)
 function MapFlyController({
   selectedPlace,
   centerPosition,
   mapPlaces,
+  cardElementRef,
 }: {
   selectedPlace: Place | null;
   centerPosition?: { lat: number; lng: number; zoom?: number } | null;
   mapPlaces: Place[];
+  cardElementRef: React.RefObject<HTMLDivElement>;
 }) {
   const map = useMap();
+  const lastSelectedPlaceIdRef = useRef<string | null>(null);
+  const lastCenterPositionKeyRef = useRef<string | null>(null);
+  const initialFitDoneRef = useRef(false);
 
+  // Invalidate map size whenever selection or visibility might have changed
+  useEffect(() => {
+    map.invalidateSize();
+  }, [map, selectedPlace]);
+
+  // Handle selected place positioning (Only once per selection change; does not reset on zoom/pan)
   useEffect(() => {
     if (
       selectedPlace &&
       selectedPlace.latitude !== null &&
       selectedPlace.longitude !== null &&
       selectedPlace.latitude !== undefined &&
-      selectedPlace.longitude !== undefined
+      selectedPlace.longitude !== undefined &&
+      !isNaN(Number(selectedPlace.latitude)) &&
+      !isNaN(Number(selectedPlace.longitude))
     ) {
+      if (lastSelectedPlaceIdRef.current === selectedPlace.id) {
+        return; // Already positioned for this place; do not reset on zoom/pan or background sync!
+      }
+      lastSelectedPlaceIdRef.current = selectedPlace.id;
+
       const isMobile = window.innerWidth < 768;
       const zoomLevel = 16;
-      const targetLatLng = L.latLng(selectedPlace.latitude, selectedPlace.longitude);
+      const targetLatLng = L.latLng(Number(selectedPlace.latitude), Number(selectedPlace.longitude));
 
-      if (isMobile) {
-        // On mobile, the top is occupied by the floating place card (~240px)
-        // and the bottom is occupied by the elevated bottom navigation bar (~75px).
-        // To place the pin exactly in the vertical center of the remaining open map space between the card bottom and navigation top,
-        // we shift the center upward (y - 145) so the marker descends into the clear visual gap.
-        const point = map.project(targetLatLng, zoomLevel);
-        const offsetPoint = L.point(point.x, point.y - 145);
-        const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
-        map.setView(offsetLatLng, zoomLevel, { animate: true });
-      } else {
-        map.setView(targetLatLng, zoomLevel, { animate: true });
+      // Use a slight timeout to let DOM layouts and tab transitions settle
+      setTimeout(() => {
+        map.invalidateSize();
+
+        if (isMobile) {
+          // Requirement 3: 手機網頁瀏覽圖釘應要在圖卡最下面與最下面的最上面之間的中間
+          const cardElem = cardElementRef.current || document.getElementById('selected-place-floating-card');
+          const cardBottom = cardElem ? cardElem.getBoundingClientRect().bottom : 300;
+          const navElem = document.querySelector('.safe-area-bottom');
+          const navTop = navElem ? navElem.getBoundingClientRect().top : (window.innerHeight - 70);
+
+          const targetScreenY = (cardBottom + navTop) / 2;
+          const screenCenterY = window.innerHeight / 2;
+          const offsetY = targetScreenY - screenCenterY;
+
+          const point = map.project(targetLatLng, zoomLevel);
+          const offsetPoint = L.point(point.x, point.y - offsetY);
+          const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
+          map.flyTo(offsetLatLng, zoomLevel, { animate: true, duration: 0.8 });
+        } else {
+          // Requirement 4: 電腦網頁圖釘不要置中 偏左下一點（目前位置的左下角移動一點點）
+          const point = map.project(targetLatLng, zoomLevel);
+          const offsetPoint = L.point(point.x + 120, point.y - 80);
+          const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
+          map.flyTo(offsetLatLng, zoomLevel, { animate: true, duration: 0.8 });
+        }
+      }, 60);
+    } else {
+      lastSelectedPlaceIdRef.current = null;
+    }
+  }, [selectedPlace, map, cardElementRef]);
+
+  // Handle explicit filter center position change (e.g. user selected city/district filter)
+  useEffect(() => {
+    if (centerPosition) {
+      const centerKey = `${centerPosition.lat.toFixed(4)},${centerPosition.lng.toFixed(4)},${centerPosition.zoom || 13}`;
+      if (lastCenterPositionKeyRef.current !== centerKey) {
+        lastCenterPositionKeyRef.current = centerKey;
+        map.flyTo([centerPosition.lat, centerPosition.lng], centerPosition.zoom || 13, {
+          animate: true,
+          duration: 0.8,
+        });
       }
-    } else if (centerPosition) {
-      map.flyTo([centerPosition.lat, centerPosition.lng], centerPosition.zoom || 13, {
-        animate: true,
-        duration: 0.8,
-      });
-    } else if (mapPlaces.length > 0) {
+    } else {
+      lastCenterPositionKeyRef.current = null;
+    }
+  }, [centerPosition, map]);
+
+  // Handle initial bounds fit (only once on first load if no place is selected)
+  useEffect(() => {
+    if (!initialFitDoneRef.current && !selectedPlace && mapPlaces.length > 0) {
       const validPlaces = mapPlaces.filter(
         (p) =>
           p.latitude !== null &&
@@ -82,13 +133,14 @@ function MapFlyController({
           !isNaN(p.longitude as number)
       );
       if (validPlaces.length > 0) {
+        initialFitDoneRef.current = true;
         const bounds = L.latLngBounds(
           validPlaces.map((p) => [p.latitude as number, p.longitude as number])
         );
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
       }
     }
-  }, [selectedPlace, centerPosition, mapPlaces, map]);
+  }, [mapPlaces, selectedPlace, map]);
 
   return null;
 }
@@ -112,6 +164,7 @@ export const MapView: React.FC<MapViewProps> = ({
 }) => {
   const defaultCenter = { lat: 23.9738, lng: 120.982, zoom: 8 };
   const [copied, setCopied] = React.useState(false);
+  const cardElementRef = useRef<HTMLDivElement>(null);
 
   // Filter only places with valid map coordinates for Leaflet Markers (always kept rendered)
   const mapPlaces = useMemo(() => {
@@ -121,8 +174,8 @@ export const MapView: React.FC<MapViewProps> = ({
         p.longitude !== null &&
         p.latitude !== undefined &&
         p.longitude !== undefined &&
-        !isNaN(p.latitude) &&
-        !isNaN(p.longitude)
+        !isNaN(Number(p.latitude)) &&
+        !isNaN(Number(p.longitude))
     );
   }, [places]);
 
@@ -175,9 +228,10 @@ export const MapView: React.FC<MapViewProps> = ({
           selectedPlace={selectedPlace}
           centerPosition={centerPosition}
           mapPlaces={mapPlaces}
+          cardElementRef={cardElementRef}
         />
 
-        {/* Places Markers (所有具備座標的地點常駐顯示，選取者微微上下跳動) */}
+        {/* Places Markers (所有具備座標的地點常駐顯示，選取者放大跳動) */}
         {mapPlaces.map((place) => {
           const isSelected = selectedPlace?.id === place.id;
 
@@ -200,14 +254,18 @@ export const MapView: React.FC<MapViewProps> = ({
           <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 animate-bounce" />
           <div>
             <p className="font-bold text-sm text-amber-200">{noMapAlert}</p>
-            <p className="text-[11px] text-slate-300">此店家尚未填寫 Google 地圖連結，僅在左側清單顯示</p>
+            <p className="text-[11px] text-slate-300">此店家尚未填寫 Google 地圖連結，僅在清單顯示</p>
           </div>
         </div>
       )}
 
       {/* 固定右上角的美食資訊圖卡 (手機版居中精巧留白、電腦版置於右上角) */}
       {selectedPlace && (
-        <div className="absolute top-3 left-3 right-3 sm:left-auto sm:right-4 z-30 sm:w-96 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
+        <div
+          id="selected-place-floating-card"
+          ref={cardElementRef}
+          className="absolute top-3 left-3 right-3 sm:left-auto sm:right-4 z-30 sm:w-96 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200"
+        >
           {/* 照片區塊 (使用美食連結的縮圖，無縮圖顯示「無圖片」) */}
           <div className="relative h-36 sm:h-44 w-full bg-slate-100 overflow-hidden">
             <AutoFoodImage place={selectedPlace} />
@@ -261,9 +319,9 @@ export const MapView: React.FC<MapViewProps> = ({
               </div>
             )}
 
-            {/* 功能按鈕列 (右上角填滿整排橫排、無空格：導航 / 介紹 / 複製) */}
+            {/* 功能按鈕列 (右上角填滿整排橫排：導航 / 介紹 / 複製) */}
             <div className="pt-2 border-t border-slate-100 flex items-center gap-2 w-full">
-              {/* 導航按鈕 (僅在有地圖連結時顯示，均分寬度) */}
+              {/* 導航按鈕 (僅在有地圖連結或座標時顯示，均分寬度) */}
               {hasMap && (
                 <button
                   onClick={() => handleNav(selectedPlace)}

@@ -14,11 +14,10 @@ export function usePlaces() {
 
   // Helper to determine API URL based on environment
   const getApiUrl = (path: string) => {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return path;
-    }
-    if (window.location.hostname.includes('pages.dev')) {
-      return path;
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname.includes('pages.dev')) {
+        return path;
+      }
     }
     return `${CLOUDFLARE_API_HOST}${path}`;
   };
@@ -29,7 +28,6 @@ export function usePlaces() {
     setError(null);
     try {
       const timestamp = Date.now();
-      // Use standard Simple Request without custom headers that trigger preflight rejections
       const response = await fetch(`${getApiUrl('/api/places')}?_t=${timestamp}`);
       if (response.ok) {
         const data = await response.json();

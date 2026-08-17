@@ -60,6 +60,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
 
   return (
     <div
+      data-testid="place-card"
       onClick={() => onSelect(place)}
       className={`group relative bg-white rounded-2xl overflow-hidden border transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md ${
         isSelected
