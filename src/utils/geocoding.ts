@@ -1,4 +1,4 @@
-// Comprehensive Geocoding, Coordinate Resolver, and Auto City/District Detector
+// Comprehensive Geocoding, Coordinate Resolver, and Auto City/District/Name Detector
 import { TAIWAN_LOCATIONS } from '../data/taiwanDistricts';
 
 const CLOUDFLARE_API_HOST = 'https://foodmap-czr.pages.dev';
@@ -16,6 +16,44 @@ function getApiUrl(path: string) {
 }
 
 /**
+ * Extract Place/Store Name from Google Maps URL
+ */
+export function extractPlaceNameFromUrl(rawInput: string): string | null {
+  if (!rawInput || !rawInput.trim()) return null;
+
+  try {
+    const decoded = decodeURIComponent(rawInput.trim());
+    // 1. /maps/place/<Name>
+    const placeMatch = decoded.match(/\/maps\/place\/([^\/@?#]+)/i);
+    if (placeMatch && placeMatch[1]) {
+      const n = placeMatch[1].replace(/\+/g, ' ').trim();
+      if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) return n;
+    }
+
+    // 2. /maps/search/<Name>
+    const searchMatch = decoded.match(/\/maps\/search\/([^\/@?#]+)/i);
+    if (searchMatch && searchMatch[1]) {
+      const n = searchMatch[1].replace(/\+/g, ' ').trim();
+      if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) return n;
+    }
+
+    // 3. Query param ?q=<Name> or ?query=<Name>
+    const qMatch = decoded.match(/[?&](?:q|query)=([^&]+)/i);
+    if (qMatch && qMatch[1]) {
+      const n = qMatch[1].replace(/\+/g, ' ').trim();
+      if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) {
+        const parts = n.split(/\s+/);
+        return parts[0] || n;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
+/**
  * Universal Coordinate Extractor for any Google Maps URL format:
  * - Direct place pins: !3d<lat>!4d<lng> or !2d<lng>!3d<lat>
  * - Search query parameters: ?q=lat,lng or &ll=lat,lng or &destination=lat,lng or &daddr=lat,lng
@@ -23,19 +61,20 @@ function getApiUrl(path: string) {
  * - Direct coordinates: lat, lng
  * - Viewport camera center: @lat,lng
  */
-export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: number; source?: string } | null {
+export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: number; source?: string; name?: string } | null {
   if (!rawInput || !rawInput.trim()) return null;
 
   // Extract clean URL or coordinates from text
   const urlMatch = rawInput.match(/https?:\/\/[^\s"'<>]+/i);
   const target = urlMatch ? urlMatch[0] : rawInput.trim();
+  const extractedName = extractPlaceNameFromUrl(target) || extractPlaceNameFromUrl(rawInput) || undefined;
 
   // 0. Direct coordinates "lat, lng" or "lat,lng"
   const rawCoordMatch = target.match(/^(-?\d{1,2}\.\d+)\s*,\s*(-?\d{2,3}\.\d+)$/);
   if (rawCoordMatch) {
     const lat = parseFloat(rawCoordMatch[1]);
     const lng = parseFloat(rawCoordMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '自訂座標' };
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '自訂座標', name: extractedName };
   }
 
   // 1. Exact Place Pin Coordinates: !3d<lat>!4d<lng> or encoded %213d<lat>%214d<lng>
@@ -43,7 +82,7 @@ export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: numb
   if (dMatch && dMatch[1] && dMatch[2]) {
     const lat = parseFloat(dMatch[1]);
     const lng = parseFloat(dMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '地標圖釘' };
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '地標圖釘', name: extractedName };
   }
 
   // 2. PB parameter reverse pin: !2d<lng>!3d<lat> or encoded %212d<lng>%213d<lat>
@@ -51,7 +90,7 @@ export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: numb
   if (pbMatch && pbMatch[1] && pbMatch[2]) {
     const lng = parseFloat(pbMatch[1]);
     const lat = parseFloat(pbMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '地標圖釘' };
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '地標圖釘', name: extractedName };
   }
 
   // 3. Exact Query parameters: ?q=lat,lng / &ll=lat,lng / &destination=lat,lng / &loc:lat,lng / &daddr=lat,lng
@@ -59,7 +98,7 @@ export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: numb
   if (queryMatch && queryMatch[1] && queryMatch[2]) {
     const lat = parseFloat(queryMatch[1]);
     const lng = parseFloat(queryMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '查詢參數' };
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '查詢參數', name: extractedName };
   }
 
   // 4. Staticmap / Preview center: center=lat,lng or center=lat%2Clng
@@ -67,7 +106,7 @@ export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: numb
   if (centerMatch && centerMatch[1] && centerMatch[2]) {
     const lat = parseFloat(centerMatch[1]);
     const lng = parseFloat(centerMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '地圖中心' };
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '地圖中心', name: extractedName };
   }
 
   // 5. Direct path search: /search/lat,lng
@@ -75,7 +114,7 @@ export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: numb
   if (searchMatch && searchMatch[1] && searchMatch[2]) {
     const lat = parseFloat(searchMatch[1]);
     const lng = parseFloat(searchMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '搜尋座標' };
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '搜尋座標', name: extractedName };
   }
 
   // 6. Camera Viewport Center: @lat,lng
@@ -83,14 +122,14 @@ export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: numb
   if (atMatch && atMatch[1] && atMatch[2]) {
     const lat = parseFloat(atMatch[1]);
     const lng = parseFloat(atMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '視角中心' };
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng, source: '視角中心', name: extractedName };
   }
 
   return null;
 }
 
 // 2. High-precision Cloudflare Serverless Resolver for Shortlinks & /data= place URLs
-export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ lat: number; lng: number; source?: string; address?: string } | null> {
+export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ lat: number; lng: number; source?: string; address?: string; name?: string } | null> {
   if (!targetUrl || !targetUrl.trim()) return null;
 
   try {
@@ -103,6 +142,7 @@ export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ l
           lng: data.longitude,
           source: data.source || '雲端精準解析',
           address: data.address || undefined,
+          name: data.name || undefined,
         };
       }
     }

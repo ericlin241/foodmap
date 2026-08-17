@@ -1,4 +1,4 @@
-// Cloudflare Pages Function to expand Google Maps links of any format and extract exact pin coordinates & address
+// Cloudflare Pages Function to expand Google Maps links of any format and extract exact pin coordinates, address & place name
 export const onRequestGet: PagesFunction = async (context) => {
   try {
     const { request } = context;
@@ -15,6 +15,39 @@ export const onRequestGet: PagesFunction = async (context) => {
       });
     }
 
+    // Helper to extract clean place name from URL
+    const extractNameFromUrl = (urlStr: string): string | null => {
+      if (!urlStr) return null;
+      try {
+        const decoded = decodeURIComponent(urlStr);
+        // 1. /maps/place/<Name>
+        const placeMatch = decoded.match(/\/maps\/place\/([^\/@?#]+)/i);
+        if (placeMatch && placeMatch[1]) {
+          const n = placeMatch[1].replace(/\+/g, ' ').trim();
+          if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) return n;
+        }
+        // 2. /maps/search/<Name>
+        const searchMatch = decoded.match(/\/maps\/search\/([^\/@?#]+)/i);
+        if (searchMatch && searchMatch[1]) {
+          const n = searchMatch[1].replace(/\+/g, ' ').trim();
+          if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) return n;
+        }
+        // 3. Query param ?q=<Name> or ?query=<Name>
+        const qMatch = decoded.match(/[?&](?:q|query)=([^&]+)/i);
+        if (qMatch && qMatch[1]) {
+          const n = qMatch[1].replace(/\+/g, ' ').trim();
+          if (!n.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) {
+            // Split out city/district if present in query like "阿堂鹹粥 台南市 中西區"
+            const parts = n.split(/\s+/);
+            return parts[0] || n;
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return null;
+    };
+
     // Clean target URL if pasted with surrounding text or raw coords
     const urlMatch = rawTargetUrl.match(/https?:\/\/[^\s"'<>]+/i);
     const targetUrl = urlMatch ? urlMatch[0] : rawTargetUrl.trim();
@@ -28,6 +61,7 @@ export const onRequestGet: PagesFunction = async (context) => {
           finalUrl: targetUrl,
           latitude: parseFloat(directCoordsMatch[1]),
           longitude: parseFloat(directCoordsMatch[2]),
+          name: null,
           source: 'direct_coordinates',
         }),
         {
@@ -65,14 +99,16 @@ export const onRequestGet: PagesFunction = async (context) => {
     };
 
     // First search in raw target URL
+    let extractedName = extractNameFromUrl(targetUrl);
     const rawCoords = searchPatterns(targetUrl);
-    if (rawCoords) {
+    if (rawCoords && extractedName) {
       return new Response(
         JSON.stringify({
           success: true,
           finalUrl: targetUrl,
           latitude: rawCoords.lat,
           longitude: rawCoords.lng,
+          name: extractedName,
           source: rawCoords.source,
         }),
         {
@@ -101,6 +137,10 @@ export const onRequestGet: PagesFunction = async (context) => {
     const finalUrl = response.url || targetUrl;
     const text = await response.text();
 
+    if (!extractedName) {
+      extractedName = extractNameFromUrl(finalUrl);
+    }
+
     let lat: number | null = null;
     let lng: number | null = null;
     let address: string | null = null;
@@ -126,6 +166,21 @@ export const onRequestGet: PagesFunction = async (context) => {
           pUrl = rawQuery;
         } else {
           pUrl = 'https://www.google.com/maps/preview/place?authuser=0&hl=zh-TW&gl=tw&' + rawQuery.replace(/^\?/, '');
+        }
+
+        // If name still not extracted, try query param from preview URL
+        if (!extractedName) {
+          const qParam = pUrl.match(/[?&]q=([^&]+)/);
+          if (qParam) {
+            try {
+              const decodedQ = decodeURIComponent(qParam[1]).replace(/\+/g, ' ').trim();
+              if (!decodedQ.match(/^-?\d+\.\d+,-?\d+\.\d+$/)) {
+                extractedName = decodedQ;
+              }
+            } catch {
+              // ignore
+            }
+          }
         }
 
         try {
@@ -216,6 +271,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         finalUrl,
         latitude: lat,
         longitude: lng,
+        name: extractedName,
         address,
         source: matchSource,
       }),

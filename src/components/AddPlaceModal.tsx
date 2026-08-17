@@ -4,6 +4,7 @@ import { Place } from '../types';
 import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
 import {
   extractCoordsFromUrl,
+  extractPlaceNameFromUrl,
   resolveGoogleMapsShortlink,
   geocodePlace,
   parseAddressToCityDistrict,
@@ -34,7 +35,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Real-time coordinates & auto location detection
+  // Real-time coordinates, auto store name & auto location detection
   const [customLat, setCustomLat] = useState<string>('');
   const [customLng, setCustomLng] = useState<string>('');
   const [showCoordInput, setShowCoordInput] = useState(false);
@@ -42,6 +43,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
   const [coordSuccessMsg, setCoordSuccessMsg] = useState<string | null>(null);
   const [coordWarnMsg, setCoordWarnMsg] = useState<string | null>(null);
   const [autoDetectedLoc, setAutoDetectedLoc] = useState<string | null>(null);
+  const [autoDetectedName, setAutoDetectedName] = useState<string | null>(null);
 
   // Real-time thumbnail preview
   const [previewImage, setPreviewImage] = useState<string>('');
@@ -91,17 +93,19 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     setError(null);
     setCoordWarnMsg(null);
     setAutoDetectedLoc(null);
+    setAutoDetectedName(null);
     setShowCoordInput(false);
   }, [initialData, isOpen]);
 
-  // Trigger coordinate resolution and auto-detect city/district when Map URL changes
-  const autoResolveCoordinates = async (rawUrlStr: string, storeName: string, currentCity: string, currentDist: string) => {
+  // Trigger coordinate resolution and auto-detect name/city/district when Map URL changes
+  const autoResolveCoordinates = async (rawUrlStr: string, currentName: string, currentCity: string, currentDist: string) => {
     if (!rawUrlStr.trim()) {
       setCustomLat('');
       setCustomLng('');
       setCoordSuccessMsg(null);
       setCoordWarnMsg(null);
       setAutoDetectedLoc(null);
+      setAutoDetectedName(null);
       return;
     }
 
@@ -113,8 +117,20 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     const urlMatch = rawUrlStr.match(/https?:\/\/[^\s"'<>]+/i);
     const cleanUrl = urlMatch ? urlMatch[0] : rawUrlStr.trim();
 
-    // Helper to auto-fill city & district
-    const applyLocationDetection = async (latNum: number, lngNum: number, rawAddrText?: string, sourceName?: string) => {
+    // Helper to auto-fill store name, city & district
+    const applyLocationDetection = async (
+      latNum: number,
+      lngNum: number,
+      rawAddrText?: string,
+      sourceName?: string,
+      detectedStoreName?: string
+    ) => {
+      // Auto-fill Store Name if currently empty
+      if (detectedStoreName && !name.trim()) {
+        setName(detectedStoreName);
+        setAutoDetectedName(detectedStoreName);
+      }
+
       let detected: { city: string; district: string } | null = null;
 
       // 1. Try parsing address text if available
@@ -147,7 +163,13 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     if (directCoords) {
       setCustomLat(String(directCoords.lat));
       setCustomLng(String(directCoords.lng));
-      await applyLocationDetection(directCoords.lat, directCoords.lng, undefined, directCoords.source);
+      await applyLocationDetection(
+        directCoords.lat,
+        directCoords.lng,
+        undefined,
+        directCoords.source,
+        directCoords.name
+      );
       setResolvingMap(false);
       return;
     }
@@ -157,14 +179,20 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     if (resolved && resolved.lat && resolved.lng) {
       setCustomLat(String(resolved.lat));
       setCustomLng(String(resolved.lng));
-      await applyLocationDetection(resolved.lat, resolved.lng, resolved.address, resolved.source);
+      await applyLocationDetection(
+        resolved.lat,
+        resolved.lng,
+        resolved.address,
+        resolved.source,
+        resolved.name
+      );
       setResolvingMap(false);
       return;
     }
 
     // 3. High-precision Geocoding fallback by Store Name
-    if (storeName.trim()) {
-      const geo = await geocodePlace(storeName.trim(), currentCity, currentDist);
+    if (currentName.trim()) {
+      const geo = await geocodePlace(currentName.trim(), currentCity, currentDist);
       if (geo) {
         setCustomLat(String(geo.lat));
         setCustomLng(String(geo.lng));
@@ -184,7 +212,15 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
 
   const handleMapUrlChange = (newUrl: string) => {
     setMapUrl(newUrl);
-    autoResolveCoordinates(newUrl, name, city, district);
+
+    // Instant client-side place name extraction from URL if name is currently empty
+    const instantName = extractPlaceNameFromUrl(newUrl);
+    if (instantName && !name.trim()) {
+      setName(instantName);
+      setAutoDetectedName(instantName);
+    }
+
+    autoResolveCoordinates(newUrl, instantName || name, city, district);
   };
 
   // When city changes manually, update district default
@@ -339,75 +375,11 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             </div>
           )}
 
-          {/* 店家名稱 */}
-          <div>
-            <label className="block font-bold text-slate-800 mb-1 text-sm">
-              店名 / 美食名稱 <span className="text-orange-600">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (mapUrl.trim()) {
-                  autoResolveCoordinates(mapUrl, e.target.value, city, district);
-                }
-              }}
-              placeholder="例：阿堂鹹粥、林東芳牛肉麵"
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm font-semibold"
-            />
-          </div>
-
-          {/* 美食連結 */}
-          <div>
-            <label className="block font-bold text-slate-800 mb-1 text-sm">
-              美食連結 (食記／IG／短影片／文章介紹) <span className="text-orange-600">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type="url"
-                required
-                value={foodUrl}
-                onChange={(e) => handleFoodUrlChange(e.target.value, category)}
-                placeholder="https://... 貼上食記分享網址、IG 或部落格連結"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm"
-              />
-              <Utensils className="w-5 h-5 text-orange-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            </div>
-
-            {/* 抓取美食連結縮圖狀態與即時預覽 */}
-            {fetchingImage && (
-              <p className="text-[11px] text-orange-600 font-semibold mt-1.5 flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                正在自動解析網址縮圖 (OpenGraph / IG / 文章預覽)...
-              </p>
-            )}
-
-            {previewImage && !fetchingImage && (
-              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
-                <img
-                  src={previewImage}
-                  alt="美食縮圖預覽"
-                  className="w-14 h-14 object-cover rounded-lg border border-slate-200 shadow-sm"
-                  onError={() => setPreviewImage('')}
-                />
-                <div>
-                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
-                    已成功讀取美食網址縮圖
-                  </p>
-                  <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">將直接顯示於地圖圖卡與美食清單上</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Google 地圖連結 (非必填) */}
+          {/* Google 地圖連結 (最上方或選填，貼上後自動帶入店名、縣市、行政區與座標) */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block font-bold text-slate-800 text-sm">
-                Google 地圖連結 <span className="text-slate-400 font-normal">(選填，貼上後自動帶入縣市與行政區)</span>
+                Google 地圖連結 <span className="text-orange-600 font-medium">(貼上自動帶入店名、縣市、行政區)</span>
               </label>
               <button
                 type="button"
@@ -421,9 +393,10 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             <div className="relative">
               <input
                 type="text"
+                id="input-modal-map-url"
                 value={mapUrl}
                 onChange={(e) => handleMapUrlChange(e.target.value)}
-                placeholder="https://maps.app.goo.gl/... 或 Google Maps 分享連結"
+                placeholder="https://maps.app.goo.gl/... 貼上地圖連結自動帶入店名與地點"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm"
               />
               <MapPin className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -433,7 +406,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             {resolvingMap && (
               <p className="text-[11px] text-orange-600 font-semibold mt-1.5 flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                正在自動解析 Google 地圖店家座標與行政區域...
+                正在自動解析 Google 地圖店家名稱、座標與行政區域...
               </p>
             )}
             {coordSuccessMsg && !resolvingMap && (
@@ -483,6 +456,83 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
                     placeholder="121.56447"
                     className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
                   />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 店家名稱 (支援 Google 地圖自動帶入) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block font-bold text-slate-800 text-sm">
+                店名 / 美食名稱 <span className="text-orange-600">*</span>
+              </label>
+              {autoDetectedName && (
+                <span className="text-[10px] text-green-700 bg-green-50 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                  <Sparkles className="w-2.5 h-2.5 text-green-600" />
+                  自動帶入
+                </span>
+              )}
+            </div>
+            <input
+              type="text"
+              id="input-modal-name"
+              required
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setAutoDetectedName(null);
+                if (mapUrl.trim()) {
+                  autoResolveCoordinates(mapUrl, e.target.value, city, district);
+                }
+              }}
+              placeholder="例：阿堂鹹粥、林東芳牛肉麵"
+              className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm font-semibold ${
+                autoDetectedName ? 'border-green-400 bg-green-50/20' : 'border-slate-300'
+              }`}
+            />
+          </div>
+
+          {/* 美食連結 */}
+          <div>
+            <label className="block font-bold text-slate-800 mb-1 text-sm">
+              美食連結 (食記／IG／短影片／文章介紹) <span className="text-orange-600">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="url"
+                id="input-modal-food-url"
+                required
+                value={foodUrl}
+                onChange={(e) => handleFoodUrlChange(e.target.value, category)}
+                placeholder="https://... 貼上食記分享網址、IG 或部落格連結"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm"
+              />
+              <Utensils className="w-5 h-5 text-orange-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            </div>
+
+            {/* 抓取美食連結縮圖狀態與即時預覽 */}
+            {fetchingImage && (
+              <p className="text-[11px] text-orange-600 font-semibold mt-1.5 flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                正在自動解析網址縮圖 (OpenGraph / IG / 文章預覽)...
+              </p>
+            )}
+
+            {previewImage && !fetchingImage && (
+              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+                <img
+                  src={previewImage}
+                  alt="美食縮圖預覽"
+                  className="w-14 h-14 object-cover rounded-lg border border-slate-200 shadow-sm"
+                  onError={() => setPreviewImage('')}
+                />
+                <div>
+                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
+                    已成功讀取美食網址縮圖
+                  </p>
+                  <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">將直接顯示於地圖圖卡與美食清單上</p>
                 </div>
               </div>
             )}
