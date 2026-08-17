@@ -68,9 +68,9 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
           : 'border-slate-200/80 hover:border-orange-300'
       }`}
     >
-      <div className="flex flex-col sm:flex-row">
-        {/* 美食照片 (由美食連結取得之縮圖，無縮圖顯示「無圖片」) */}
-        <div className="relative sm:w-36 h-36 sm:h-auto shrink-0 bg-slate-100 overflow-hidden">
+      <div className="flex flex-col sm:flex-row items-stretch">
+        {/* 美食照片 (由美食連結取得之縮圖，統一 1:1 正方形比例) */}
+        <div className="relative w-full sm:w-32 md:w-36 h-44 sm:h-32 md:h-36 aspect-square shrink-0 bg-slate-100 overflow-hidden">
           <AutoFoodImage
             place={place}
             className="group-hover:scale-105 transition-transform duration-300"
