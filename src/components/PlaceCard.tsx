@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigation, Share2, Trash2, MapPin, Star, ExternalLink, MessageCircle, Copy, Check } from 'lucide-react';
+import { Navigation, Trash2, MapPin, MessageCircle, Copy, Check } from 'lucide-react';
 import { Place } from '../types';
 
 interface PlaceCardProps {
@@ -7,7 +7,6 @@ interface PlaceCardProps {
   isSelected?: boolean;
   onSelect: (place: Place) => void;
   onDelete: (id: string) => void;
-  seniorMode: boolean;
 }
 
 export const PlaceCard: React.FC<PlaceCardProps> = ({
@@ -15,11 +14,9 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
   isSelected,
   onSelect,
   onDelete,
-  seniorMode,
 }) => {
   const [copied, setCopied] = useState(false);
 
-  // Fallback image if image_url fails or is empty
   const defaultImg =
     'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
 
@@ -83,17 +80,9 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
         <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
           <div>
             <div className="flex items-start justify-between gap-2">
-              <h3
-                className={`font-black text-slate-900 leading-snug group-hover:text-orange-600 transition-colors ${
-                  seniorMode ? 'text-xl' : 'text-base'
-                }`}
-              >
+              <h3 className="font-black text-slate-900 leading-snug group-hover:text-orange-600 transition-colors text-base sm:text-lg">
                 {place.name}
               </h3>
-              <div className="flex items-center gap-1 text-amber-500 font-bold text-xs bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span>{place.rating || 5.0}</span>
-              </div>
             </div>
 
             {/* 地區 */}
@@ -106,25 +95,19 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
 
             {/* 私房備註 */}
             {place.note && (
-              <p
-                className={`mt-2 text-slate-600 bg-amber-50/70 p-2 rounded-xl border border-amber-100/80 font-normal line-clamp-2 leading-relaxed ${
-                  seniorMode ? 'text-base font-medium text-slate-800' : 'text-xs'
-                }`}
-              >
+              <p className="mt-2 text-slate-600 bg-amber-50/70 p-2 rounded-xl border border-amber-100/80 font-normal line-clamp-2 leading-relaxed text-xs sm:text-sm">
                 💬 {place.note}
               </p>
             )}
           </div>
 
-          {/* 底部功能操作列 (長輩超大觸控按鈕) */}
+          {/* 底部功能操作列 */}
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
             {/* 一鍵 Google Maps 導航 */}
             <button
               id={`btn-nav-${place.id}`}
               onClick={handleOpenNav}
-              className={`flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all ${
-                seniorMode ? 'px-4 py-2.5 text-base' : 'px-3 py-1.5 text-xs'
-              }`}
+              className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-3 py-1.5 text-xs sm:text-sm"
               title="開啟 Google 地圖進行即時導航"
             >
               <Navigation className="w-4 h-4 fill-white" />

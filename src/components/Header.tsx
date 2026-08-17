@@ -1,9 +1,7 @@
 import React from 'react';
-import { Utensils, Sparkles, Plus, RefreshCw, Layers } from 'lucide-react';
+import { Utensils, Sparkles, Plus, Layers } from 'lucide-react';
 
 interface HeaderProps {
-  seniorMode: boolean;
-  setSeniorMode: (val: boolean | ((prev: boolean) => boolean)) => void;
   onOpenAddModal: () => void;
   onOpenWheelModal: () => void;
   onOpenStatsModal: () => void;
@@ -11,8 +9,6 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  seniorMode,
-  setSeniorMode,
   onOpenAddModal,
   onOpenWheelModal,
   onOpenStatsModal,
@@ -26,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className={`font-black tracking-tight ${seniorMode ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}`}>
+            <h1 className="font-black tracking-tight text-xl sm:text-2xl">
               台灣美食地圖
             </h1>
             <span className="hidden sm:inline-block bg-orange-800/40 text-orange-100 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-orange-400/30">
@@ -34,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
           <p className="text-xs sm:text-sm text-orange-100/90 font-medium">
-            長輩友善 • 景點食記永久收藏
+            景點食記永久收藏
           </p>
         </div>
       </div>
@@ -44,15 +40,15 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           id="btn-random-wheel"
           onClick={onOpenWheelModal}
-          className="flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-bold px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-md active:scale-95 transition-all text-xs sm:text-sm"
-          title="今天不知道吃什麼？讓系統幫你抽籤！"
+          className="flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-bold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-md active:scale-95 transition-all text-xs sm:text-sm"
+          title="今天不知道吃什麼？讓系統幫你從當前選取區域抽籤！"
         >
           <Sparkles className="w-4 h-4 text-amber-900" />
           <span className="hidden md:inline">今天吃什麼？</span>
           <span className="md:hidden">抽籤</span>
         </button>
 
-        {/* 美食統計 */}
+        {/* 美食統計概況 */}
         <button
           id="btn-stats"
           onClick={onOpenStatsModal}
@@ -63,22 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden lg:inline">地圖概況</span>
         </button>
 
-        {/* 長輩大字體模式切換 */}
-        <button
-          id="btn-senior-mode"
-          onClick={() => setSeniorMode((prev) => !prev)}
-          className={`flex items-center gap-1.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all border ${
-            seniorMode
-              ? 'bg-yellow-300 text-yellow-950 border-yellow-400 shadow-lg scale-105'
-              : 'bg-white/10 hover:bg-white/20 text-white border-white/20'
-          }`}
-          title="切換大字體與加大按鈕模式"
-        >
-          <span>👵</span>
-          <span>{seniorMode ? '大字模式 (開)' : '長輩大字'}</span>
-        </button>
-
-        {/* 電腦版頂部直接新增按鈕 */}
+        {/* 電腦版頂部新增按鈕 */}
         <button
           id="btn-desktop-add"
           onClick={onOpenAddModal}

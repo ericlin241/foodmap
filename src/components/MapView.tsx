@@ -1,14 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Place } from '../types';
-import { Navigation, Star, MapPin } from 'lucide-react';
+import { Navigation, MapPin } from 'lucide-react';
 
 // Custom Marker Icons (Super clear, distinct orange pin with food emoji)
 const createCustomIcon = (isSelected: boolean) => {
   const width = isSelected ? 46 : 38;
   const height = isSelected ? 58 : 48;
-  const pinBg = isSelected ? '#dc2626' : '#ea580c'; // Highlighted in bold red-orange
+  const pinBg = isSelected ? '#dc2626' : '#ea580c';
   const strokeColor = '#ffffff';
 
   const svgHtml = `
@@ -27,7 +27,7 @@ const createCustomIcon = (isSelected: boolean) => {
     html: svgHtml,
     className: isSelected ? 'custom-marker-active' : '',
     iconSize: [width, height],
-    iconAnchor: [width / 2, height], // 精準釘尖對齊座標
+    iconAnchor: [width / 2, height],
     popupAnchor: [0, -height + 4],
   });
 };
@@ -116,10 +116,6 @@ function MarkerItem({
           <div className="p-3.5">
             <div className="flex items-start justify-between gap-1">
               <h4 className="font-bold text-slate-900 text-base">{place.name}</h4>
-              <div className="flex items-center gap-1 text-amber-500 font-bold text-xs bg-amber-50 px-1.5 py-0.5 rounded">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span>{place.rating || 5.0}</span>
-              </div>
             </div>
 
             <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
@@ -154,7 +150,6 @@ interface MapViewProps {
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
   centerPosition?: { lat: number; lng: number; zoom?: number } | null;
-  seniorMode: boolean;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -162,9 +157,8 @@ export const MapView: React.FC<MapViewProps> = ({
   selectedPlace,
   onSelectPlace,
   centerPosition,
-  seniorMode,
 }) => {
-  const defaultCenter = { lat: 23.9738, lng: 120.982, zoom: 8 }; // Taiwan Center
+  const defaultCenter = { lat: 23.9738, lng: 120.982, zoom: 8 };
 
   const handleNav = (place: Place) => {
     if (place.url) {

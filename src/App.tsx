@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { FilterBar } from './components/FilterBar';
 import { PlaceCard } from './components/PlaceCard';
@@ -9,7 +9,7 @@ import { StatsModal } from './components/StatsModal';
 import { usePlaces } from './hooks/usePlaces';
 import { Place } from './types';
 import { TAIWAN_LOCATIONS } from './data/taiwanDistricts';
-import { Map, List, Plus, Database, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { Map, List, Plus, Database, AlertCircle, RefreshCw } from 'lucide-react';
 
 export function App() {
   const { places, loading, isD1Connected, addPlace, deletePlace, resetToSampleData } = usePlaces();
@@ -21,7 +21,6 @@ export function App() {
   const [searchKeyword, setSearchKeyword] = useState('');
 
   // UI state
-  const [seniorMode, setSeniorMode] = useState(false);
   const [mobileTab, setMobileTab] = useState<'map' | 'list'>('map');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
@@ -29,15 +28,6 @@ export function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isWheelModalOpen, setIsWheelModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
-
-  // Apply Senior Mode class to body
-  useEffect(() => {
-    if (seniorMode) {
-      document.body.classList.add('senior-mode');
-    } else {
-      document.body.classList.remove('senior-mode');
-    }
-  }, [seniorMode]);
 
   // Center position for map based on filter selection
   const mapCenterPosition = useMemo(() => {
@@ -75,6 +65,15 @@ export function App() {
     });
   }, [places, selectedCity, selectedDistrict, selectedCategory, searchKeyword]);
 
+  // Places for Random Wheel: drawn specifically from currently selected City/District
+  const wheelCandidatePlaces = useMemo(() => {
+    return places.filter((place) => {
+      if (selectedCity && place.city !== selectedCity) return false;
+      if (selectedDistrict && place.district !== selectedDistrict) return false;
+      return true;
+    });
+  }, [places, selectedCity, selectedDistrict]);
+
   const handleResetFilters = () => {
     setSelectedCity('');
     setSelectedDistrict('');
@@ -94,8 +93,6 @@ export function App() {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100 font-sans">
       {/* 頂部導航列 */}
       <Header
-        seniorMode={seniorMode}
-        setSeniorMode={setSeniorMode}
         onOpenAddModal={() => {
           setIsAddModalOpen(true);
         }}
@@ -140,7 +137,6 @@ export function App() {
             setSelectedCategory={setSelectedCategory}
             searchKeyword={searchKeyword}
             setSearchKeyword={setSearchKeyword}
-            seniorMode={seniorMode}
             onReset={handleResetFilters}
           />
 
@@ -178,7 +174,6 @@ export function App() {
                   isSelected={selectedPlace?.id === place.id}
                   onSelect={handleSelectPlace}
                   onDelete={deletePlace}
-                  seniorMode={seniorMode}
                 />
               ))
             )}
@@ -196,12 +191,11 @@ export function App() {
             selectedPlace={selectedPlace}
             onSelectPlace={handleSelectPlace}
             centerPosition={mapCenterPosition}
-            seniorMode={seniorMode}
           />
         </main>
       </div>
 
-      {/* 手機版底部導航與懸浮切換列 (長輩大觸控友善) */}
+      {/* 手機版底部導航與懸浮切換列 */}
       <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-slate-200 p-2 px-4 flex items-center justify-around z-30 shadow-lg">
         {/* 切換為地圖模式 */}
         <button
@@ -245,16 +239,16 @@ export function App() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddPlace={addPlace}
-        seniorMode={seniorMode}
       />
 
-      {/* 隨機美食轉盤抽籤彈窗 */}
+      {/* 隨機美食轉盤抽籤彈窗 (限定當前選取縣市/行政區) */}
       <RandomWheel
         isOpen={isWheelModalOpen}
         onClose={() => setIsWheelModalOpen(false)}
-        places={filteredPlaces.length > 0 ? filteredPlaces : places}
+        places={wheelCandidatePlaces}
+        selectedCity={selectedCity}
+        selectedDistrict={selectedDistrict}
         onSelectPlace={handleSelectPlace}
-        seniorMode={seniorMode}
       />
 
       {/* 統計資訊彈窗 */}
@@ -262,7 +256,6 @@ export function App() {
         isOpen={isStatsModalOpen}
         onClose={() => setIsStatsModalOpen(false)}
         places={places}
-        seniorMode={seniorMode}
       />
     </div>
   );

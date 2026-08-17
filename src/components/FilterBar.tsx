@@ -11,7 +11,6 @@ interface FilterBarProps {
   setSelectedCategory: (cat: string) => void;
   searchKeyword: string;
   setSearchKeyword: (keyword: string) => void;
-  seniorMode: boolean;
   onReset: () => void;
 }
 
@@ -24,7 +23,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   setSelectedCategory,
   searchKeyword,
   setSearchKeyword,
-  seniorMode,
   onReset,
 }) => {
   // Find current city's district list
@@ -33,7 +31,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
   const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedCity(e.target.value);
-    setSelectedDistrict(''); // Reset district when city changes
+    setSelectedDistrict('');
   };
 
   return (
@@ -47,9 +45,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
           placeholder="搜尋店名、必吃招牌菜、備註關鍵字..."
-          className={`w-full pl-11 pr-4 py-2.5 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all ${
-            seniorMode ? 'text-lg py-3' : 'text-sm'
-          }`}
+          className="w-full pl-11 pr-4 py-2.5 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-sm"
         />
         {searchKeyword && (
           <button
@@ -69,9 +65,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             id="select-city"
             value={selectedCity}
             onChange={handleCityChange}
-            className={`w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 pr-8 font-medium text-slate-700 focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all ${
-              seniorMode ? 'text-base font-bold' : 'text-sm'
-            }`}
+            className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 pr-8 font-medium text-slate-700 focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all text-sm"
           >
             <option value="">全台灣 (全部縣市)</option>
             {TAIWAN_LOCATIONS.map((c) => (
@@ -90,9 +84,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             value={selectedDistrict}
             onChange={(e) => setSelectedDistrict(e.target.value)}
             disabled={!selectedCity}
-            className={`w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 pr-8 font-medium text-slate-700 focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all disabled:opacity-50 disabled:bg-slate-100 ${
-              seniorMode ? 'text-base font-bold' : 'text-sm'
-            }`}
+            className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 pr-8 font-medium text-slate-700 focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all disabled:opacity-50 disabled:bg-slate-100 text-sm"
           >
             <option value="">全部行政區</option>
             {districtList.map((d) => (
@@ -110,9 +102,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             id="select-category"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className={`w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 pr-8 font-medium text-slate-700 focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all ${
-              seniorMode ? 'text-base font-bold' : 'text-sm'
-            }`}
+            className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 pr-8 font-medium text-slate-700 focus:ring-2 focus:ring-orange-500 focus:outline-none transition-all text-sm"
           >
             {FOOD_CATEGORIES.map((cat) => (
               <option key={cat} value={cat === '全部類別' ? '' : cat}>

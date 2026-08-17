@@ -1,19 +1,17 @@
 import React from 'react';
-import { X, MapPin, PieChart, Award, Bookmark } from 'lucide-react';
+import { X, MapPin, PieChart, Bookmark } from 'lucide-react';
 import { Place } from '../types';
 
 interface StatsModalProps {
   isOpen: boolean;
   onClose: () => void;
   places: Place[];
-  seniorMode: boolean;
 }
 
 export const StatsModal: React.FC<StatsModalProps> = ({
   isOpen,
   onClose,
   places,
-  seniorMode,
 }) => {
   if (!isOpen) return null;
 
@@ -37,7 +35,7 @@ export const StatsModal: React.FC<StatsModalProps> = ({
         <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <PieChart className="w-6 h-6" />
-            <h3 className={`font-black tracking-tight ${seniorMode ? 'text-2xl' : 'text-xl'}`}>
+            <h3 className="font-black tracking-tight text-xl">
               📊 私房美食地圖統計
             </h3>
           </div>
@@ -68,7 +66,7 @@ export const StatsModal: React.FC<StatsModalProps> = ({
             </h4>
             <div className="space-y-2">
               {sortedCities.map(([city, count]) => {
-                const percentage = Math.round((count / places.length) * 100);
+                const percentage = places.length > 0 ? Math.round((count / places.length) * 100) : 0;
                 return (
                   <div key={city} className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
                     <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">

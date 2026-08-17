@@ -303,4 +303,5 @@ export const FOOD_CATEGORIES = [
   '咖啡茶飲',
   '夜市必吃',
   '家庭聚餐',
+  '其他',
 ];
