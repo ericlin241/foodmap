@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Link2, MapPin, AlertCircle, Utensils } from 'lucide-react';
 import { Place } from '../types';
 import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
+import { extractCoordsFromUrl, geocodePlace } from '../utils/geocoding';
 
 interface PlaceModalProps {
   isOpen: boolean;
@@ -58,27 +59,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     }
   };
 
-  // Auto extract coordinates from Google Maps URL if provided
-  const extractCoordsFromMapUrl = (inputUrl: string) => {
-    if (!inputUrl || !inputUrl.trim()) return null;
 
-    const coordMatch = inputUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (coordMatch && coordMatch[1] && coordMatch[2]) {
-      return { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]) };
-    }
-
-    const dMatch = inputUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-    if (dMatch && dMatch[1] && dMatch[2]) {
-      return { lat: parseFloat(dMatch[1]), lng: parseFloat(dMatch[2]) };
-    }
-
-    const queryCoordMatch = inputUrl.match(/[?&](?:q|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (queryCoordMatch && queryCoordMatch[1] && queryCoordMatch[2]) {
-      return { lat: parseFloat(queryCoordMatch[1]), lng: parseFloat(queryCoordMatch[2]) };
-    }
-
-    return null;
-  };
 
   // Helper: Extract or fetch thumbnail from food_url
   const getThumbnailFromFoodUrl = (url: string, cat: string) => {
@@ -124,21 +105,30 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     }
 
     // Google Maps coordinates logic:
-    // If map_url is provided, calculate coordinates. If not provided, lat/lng will be null (won't show on map).
+    // 1. First try parsing exact coordinates from mapUrl (@lat,lng or !3d!4d or ?q=)
+    // 2. If not found in mapUrl, query high-precision geocoding via OpenStreetMap for the exact store name and city/district
+    // 3. If geocoding fails, fallback to district center coordinates
     let finalLat: number | null = null;
     let finalLng: number | null = null;
 
     if (mapUrl.trim()) {
-      const urlCoords = extractCoordsFromMapUrl(mapUrl.trim());
+      const urlCoords = extractCoordsFromUrl(mapUrl.trim());
       if (urlCoords) {
         finalLat = urlCoords.lat;
         finalLng = urlCoords.lng;
       } else {
-        // Fallback to district center
-        const cityData = TAIWAN_LOCATIONS.find((c) => c.city === city);
-        const distData = cityData?.districts.find((d) => d.name === district);
-        finalLat = distData?.lat || cityData?.lat || 25.0375;
-        finalLng = distData?.lng || cityData?.lng || 121.5637;
+        // High-precision geocoding for store name in this district
+        const geoResult = await geocodePlace(name.trim(), city, district);
+        if (geoResult) {
+          finalLat = geoResult.lat;
+          finalLng = geoResult.lng;
+        } else {
+          // District center fallback
+          const cityData = TAIWAN_LOCATIONS.find((c) => c.city === city);
+          const distData = cityData?.districts.find((d) => d.name === district);
+          finalLat = distData?.lat || cityData?.lat || 25.0375;
+          finalLng = distData?.lng || cityData?.lng || 121.5637;
+        }
       }
     }
 
