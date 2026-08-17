@@ -116,9 +116,9 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  // 複製「美食連結」
+  // 複製「美食連結 (食記／IG／短影片／文章介紹)」
   const handleCopyFoodLink = (place: Place) => {
-    const linkToCopy = place.food_url || place.map_url || '';
+    const linkToCopy = place.food_url || '';
     if (linkToCopy) {
       navigator.clipboard.writeText(linkToCopy);
       setCopied(true);
@@ -269,13 +269,13 @@ export const MapView: React.FC<MapViewProps> = ({
                 onClick={() => handleCopyFoodLink(selectedPlace)}
                 className={`py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 border transition-all ${
                   copied
-                    ? 'bg-green-50 border-green-300 text-green-700'
+                    ? 'bg-green-50 border-green-300 text-green-700 font-bold'
                     : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
                 }`}
                 title="複製美食食記或文章連結"
               >
                 {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? '已複製' : '複製美食連結'}</span>
+                <span>{copied ? '已複製' : '複製'}</span>
               </button>
             </div>
           </div>

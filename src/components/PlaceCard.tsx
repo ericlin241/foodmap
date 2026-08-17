@@ -43,10 +43,10 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
     }
   };
 
-  // 複製「美食連結」
+  // 複製「美食連結 (食記／IG／短影片／文章介紹)」
   const handleCopyFoodLink = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const linkToCopy = place.food_url || place.map_url || '';
+    const linkToCopy = place.food_url || '';
     if (linkToCopy) {
       navigator.clipboard.writeText(linkToCopy);
       setCopied(true);
@@ -169,7 +169,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
                 title="複製美食食記或文章分享連結"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? '已複製' : '複製美食連結'}</span>
+                <span>{copied ? '已複製' : '複製'}</span>
               </button>
 
               {/* 刪除 */}
