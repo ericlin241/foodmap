@@ -5,11 +5,11 @@ interface Env {
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+  'Access-Control-Allow-Headers': '*',
   'Access-Control-Max-Age': '86400',
 };
 
-// OPTIONS: Handle CORS Preflight for cross-domain requests (GitHub Pages -> Cloudflare)
+// OPTIONS: Handle CORS Preflight for all cross-domain requests
 export const onRequestOptions: PagesFunction = async () => {
   return new Response(null, {
     status: 204,

@@ -15,12 +15,11 @@ export function usePlaces() {
   // Helper to determine API URL based on environment
   const getApiUrl = (path: string) => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return path; // Use local Vite proxy
+      return path;
     }
     if (window.location.hostname.includes('pages.dev')) {
-      return path; // Same-origin Cloudflare Pages
+      return path;
     }
-    // GitHub Pages or external device -> point directly to Cloudflare D1 API host
     return `${CLOUDFLARE_API_HOST}${path}`;
   };
 
@@ -30,28 +29,22 @@ export function usePlaces() {
     setError(null);
     try {
       const timestamp = Date.now();
-      const response = await fetch(`${getApiUrl('/api/places')}?_t=${timestamp}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-      });
+      // Use standard Simple Request without custom headers that trigger preflight rejections
+      const response = await fetch(`${getApiUrl('/api/places')}?_t=${timestamp}`);
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
           setPlaces(data);
           setIsD1Connected(true);
           setLoading(false);
-          // Sync to local backup
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
           } catch {}
           return;
         }
       }
-    } catch {
-      // D1 API call failed
+    } catch (err) {
+      console.warn('D1 Fetch Error:', err);
     }
 
     // Fallback: LocalStorage
@@ -74,7 +67,6 @@ export function usePlaces() {
   useEffect(() => {
     fetchPlaces();
 
-    // Auto-poll every 5 seconds so any device updates immediately reflect on all open tabs/devices
     const timer = setInterval(() => {
       fetchPlaces(true);
     }, 5000);
@@ -105,7 +97,6 @@ export function usePlaces() {
       savedToD1 = false;
     }
 
-    // Update local state and backup
     setPlaces((prev) => {
       const updated = [newPlace, ...prev];
       try {
@@ -114,7 +105,6 @@ export function usePlaces() {
       return updated;
     });
 
-    // Immediate re-fetch from D1
     setTimeout(() => {
       fetchPlaces(true);
     }, 500);
