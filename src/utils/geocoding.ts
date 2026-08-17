@@ -1,4 +1,5 @@
-// Comprehensive Geocoding and Coordinate Resolver
+// Comprehensive Geocoding, Coordinate Resolver, and Auto City/District Detector
+import { TAIWAN_LOCATIONS } from '../data/taiwanDistricts';
 
 const CLOUDFLARE_API_HOST = 'https://foodmap-czr.pages.dev';
 
@@ -89,7 +90,7 @@ export function extractCoordsFromUrl(rawInput: string): { lat: number; lng: numb
 }
 
 // 2. High-precision Cloudflare Serverless Resolver for Shortlinks & /data= place URLs
-export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ lat: number; lng: number; source?: string } | null> {
+export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ lat: number; lng: number; source?: string; address?: string } | null> {
   if (!targetUrl || !targetUrl.trim()) return null;
 
   try {
@@ -97,7 +98,12 @@ export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ l
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.latitude && data.longitude) {
-        return { lat: data.latitude, lng: data.longitude, source: data.source || '雲端精準解析' };
+        return {
+          lat: data.latitude,
+          lng: data.longitude,
+          source: data.source || '雲端精準解析',
+          address: data.address || undefined,
+        };
       }
     }
   } catch {
@@ -106,7 +112,96 @@ export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ l
   return null;
 }
 
-// 3. High-precision Geocoding using OpenStreetMap Nominatim
+// 3. Match address string to Taiwan City & District
+export function parseAddressToCityDistrict(addressText: string): { city: string; district: string } | null {
+  if (!addressText || !addressText.trim()) return null;
+  const normalized = addressText.replace(/臺/g, '台').trim();
+
+  // Try matching City + District
+  for (const c of TAIWAN_LOCATIONS) {
+    const shortCity = c.city.replace('市', '').replace('縣', '');
+    if (normalized.includes(c.city) || normalized.includes(shortCity)) {
+      for (const d of c.districts) {
+        if (normalized.includes(d.name)) {
+          return { city: c.city, district: d.name };
+        }
+      }
+    }
+  }
+
+  // Fallback: match any unique district name
+  for (const c of TAIWAN_LOCATIONS) {
+    for (const d of c.districts) {
+      if (normalized.includes(d.name)) {
+        return { city: c.city, district: d.name };
+      }
+    }
+  }
+
+  return null;
+}
+
+// 4. Reverse Geocode Coordinates to Taiwan City & District
+export async function reverseGeocodeCityDistrict(lat: number, lng: number): Promise<{ city: string; district: string } | null> {
+  if (isNaN(lat) || isNaN(lng)) return null;
+
+  // 1. Try Nominatim Reverse Geocoding
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=zh-TW`,
+      {
+        headers: {
+          'Accept-Language': 'zh-TW,zh;q=0.9',
+        },
+      }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.address) {
+        const addr = data.address;
+        const rawCity = (addr.city || addr.county || addr.state || '').replace(/臺/g, '台');
+        const rawDist = (addr.suburb || addr.town || addr.district || addr.city_district || addr.village || '').replace(/臺/g, '台');
+
+        for (const c of TAIWAN_LOCATIONS) {
+          if (rawCity.includes(c.city) || c.city.includes(rawCity) || rawCity.includes(c.city.replace('市', '').replace('縣', ''))) {
+            for (const d of c.districts) {
+              if (rawDist.includes(d.name) || d.name.includes(rawDist)) {
+                return { city: c.city, district: d.name };
+              }
+            }
+          }
+        }
+
+        if (data.display_name) {
+          const parsed = parseAddressToCityDistrict(data.display_name);
+          if (parsed) return parsed;
+        }
+      }
+    }
+  } catch {
+    // Reverse geocoding fallback
+  }
+
+  // 2. Spatial Nearest Neighbor in TAIWAN_LOCATIONS
+  let minDistance = Infinity;
+  let bestMatch: { city: string; district: string } | null = null;
+
+  for (const cityData of TAIWAN_LOCATIONS) {
+    for (const dist of cityData.districts) {
+      const dLat = lat - dist.lat;
+      const dLng = (lng - dist.lng) * 0.9135;
+      const distSq = dLat * dLat + dLng * dLng;
+      if (distSq < minDistance) {
+        minDistance = distSq;
+        bestMatch = { city: cityData.city, district: dist.name };
+      }
+    }
+  }
+
+  return bestMatch;
+}
+
+// 5. High-precision Geocoding by Store Name
 export async function geocodePlace(name: string, city: string, district: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const cleanName = name.replace(/（[^）]*）|\([^)]*\)/g, '').trim();

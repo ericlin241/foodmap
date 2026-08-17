@@ -1,4 +1,4 @@
-// Cloudflare Pages Function to expand Google Maps links of any format and extract exact pin coordinates
+// Cloudflare Pages Function to expand Google Maps links of any format and extract exact pin coordinates & address
 export const onRequestGet: PagesFunction = async (context) => {
   try {
     const { request } = context;
@@ -103,6 +103,7 @@ export const onRequestGet: PagesFunction = async (context) => {
 
     let lat: number | null = null;
     let lng: number | null = null;
+    let address: string | null = null;
     let matchSource = 'unknown';
 
     // Search in final redirected URL
@@ -136,6 +137,14 @@ export const onRequestGet: PagesFunction = async (context) => {
           });
           if (pRes.ok) {
             const pText = await pRes.text();
+
+            // Extract address if available (e.g. ["112臺北市北投區尊賢里尊賢街218巷23弄12號"])
+            const addrMatch = pText.match(/\["(\d{3,5}[\u4e00-\u9fa50-9號巷弄路街段里村鄰市縣區鄉鎮\- ]+?)"\]/) ||
+                              pText.match(/\["([\u4e00-\u9fa5]{2,3}[市縣][\u4e00-\u9fa5]{2,4}[區鄉鎮市][\u4e00-\u9fa50-9號巷弄路街段里村鄰\- ]+?)"\]/);
+            if (addrMatch) {
+              address = addrMatch[1];
+            }
+
             const twPair = pText.match(/(2[1-6]\.\d{4,10})[,\s]+(1[1-2][9012]\.\d{4,10})/);
             if (twPair) {
               lat = parseFloat(twPair[1]);
@@ -207,6 +216,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         finalUrl,
         latitude: lat,
         longitude: lng,
+        address,
         source: matchSource,
       }),
       {

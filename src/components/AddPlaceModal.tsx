@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, AlertCircle, Utensils, Check, Edit2 } from 'lucide-react';
+import { X, MapPin, AlertCircle, Utensils, Check, Edit2, Sparkles } from 'lucide-react';
 import { Place } from '../types';
 import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
-import { extractCoordsFromUrl, resolveGoogleMapsShortlink, geocodePlace } from '../utils/geocoding';
+import {
+  extractCoordsFromUrl,
+  resolveGoogleMapsShortlink,
+  geocodePlace,
+  parseAddressToCityDistrict,
+  reverseGeocodeCityDistrict,
+} from '../utils/geocoding';
 import { fetchLinkThumbnail } from '../utils/linkPreview';
 
 interface PlaceModalProps {
@@ -28,13 +34,14 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Real-time coordinates
+  // Real-time coordinates & auto location detection
   const [customLat, setCustomLat] = useState<string>('');
   const [customLng, setCustomLng] = useState<string>('');
   const [showCoordInput, setShowCoordInput] = useState(false);
   const [resolvingMap, setResolvingMap] = useState(false);
   const [coordSuccessMsg, setCoordSuccessMsg] = useState<string | null>(null);
   const [coordWarnMsg, setCoordWarnMsg] = useState<string | null>(null);
+  const [autoDetectedLoc, setAutoDetectedLoc] = useState<string | null>(null);
 
   // Real-time thumbnail preview
   const [previewImage, setPreviewImage] = useState<string>('');
@@ -83,16 +90,18 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     }
     setError(null);
     setCoordWarnMsg(null);
+    setAutoDetectedLoc(null);
     setShowCoordInput(false);
   }, [initialData, isOpen]);
 
-  // Trigger coordinate resolution when Map URL or Name/City/District changes
-  const autoResolveCoordinates = async (rawUrlStr: string, storeName: string, cityName: string, distName: string) => {
+  // Trigger coordinate resolution and auto-detect city/district when Map URL changes
+  const autoResolveCoordinates = async (rawUrlStr: string, storeName: string, currentCity: string, currentDist: string) => {
     if (!rawUrlStr.trim()) {
       setCustomLat('');
       setCustomLng('');
       setCoordSuccessMsg(null);
       setCoordWarnMsg(null);
+      setAutoDetectedLoc(null);
       return;
     }
 
@@ -104,12 +113,41 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     const urlMatch = rawUrlStr.match(/https?:\/\/[^\s"'<>]+/i);
     const cleanUrl = urlMatch ? urlMatch[0] : rawUrlStr.trim();
 
+    // Helper to auto-fill city & district
+    const applyLocationDetection = async (latNum: number, lngNum: number, rawAddrText?: string, sourceName?: string) => {
+      let detected: { city: string; district: string } | null = null;
+
+      // 1. Try parsing address text if available
+      if (rawAddrText) {
+        detected = parseAddressToCityDistrict(rawAddrText);
+      }
+      if (!detected && rawUrlStr) {
+        detected = parseAddressToCityDistrict(rawUrlStr);
+      }
+
+      // 2. Reverse geocode from coordinates
+      if (!detected) {
+        detected = await reverseGeocodeCityDistrict(latNum, lngNum);
+      }
+
+      if (detected) {
+        setCity(detected.city);
+        setDistrict(detected.district);
+        setAutoDetectedLoc(`${detected.city} ${detected.district}`);
+        setCoordSuccessMsg(
+          `已自動帶入：${detected.city} ${detected.district} (${latNum.toFixed(5)}, ${lngNum.toFixed(5)})`
+        );
+      } else {
+        setCoordSuccessMsg(`已取得圖釘座標 (${latNum.toFixed(5)}, ${lngNum.toFixed(5)}) [${sourceName || '網址提取'}]`);
+      }
+    };
+
     // 1. Direct Regex from URL / Raw Coordinates
     const directCoords = extractCoordsFromUrl(cleanUrl);
     if (directCoords) {
       setCustomLat(String(directCoords.lat));
       setCustomLng(String(directCoords.lng));
-      setCoordSuccessMsg(`已取得圖釘座標 (${directCoords.lat.toFixed(5)}, ${directCoords.lng.toFixed(5)}) [${directCoords.source || '網址提取'}]`);
+      await applyLocationDetection(directCoords.lat, directCoords.lng, undefined, directCoords.source);
       setResolvingMap(false);
       return;
     }
@@ -119,18 +157,18 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     if (resolved && resolved.lat && resolved.lng) {
       setCustomLat(String(resolved.lat));
       setCustomLng(String(resolved.lng));
-      setCoordSuccessMsg(`已取得 Google 地圖圖釘座標 (${resolved.lat.toFixed(5)}, ${resolved.lng.toFixed(5)})`);
+      await applyLocationDetection(resolved.lat, resolved.lng, resolved.address, resolved.source);
       setResolvingMap(false);
       return;
     }
 
     // 3. High-precision Geocoding fallback by Store Name
     if (storeName.trim()) {
-      const geo = await geocodePlace(storeName.trim(), cityName, distName);
+      const geo = await geocodePlace(storeName.trim(), currentCity, currentDist);
       if (geo) {
         setCustomLat(String(geo.lat));
         setCustomLng(String(geo.lng));
-        setCoordSuccessMsg(`店家精準定位 (${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)})`);
+        await applyLocationDetection(geo.lat, geo.lng, undefined, '店家精準定位');
         setResolvingMap(false);
         return;
       }
@@ -139,7 +177,8 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     // Never fallback to district center! Leave coordinates empty and inform user
     setCustomLat('');
     setCustomLng('');
-    setCoordWarnMsg('未能自動讀取精確圖釘座標，可展開下方手動輸入經緯度');
+    setAutoDetectedLoc(null);
+    setCoordWarnMsg('未能自動讀取精確圖釘座標，可手動點選縣市行政區或自訂經緯度');
     setResolvingMap(false);
   };
 
@@ -148,24 +187,20 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     autoResolveCoordinates(newUrl, name, city, district);
   };
 
-  // When city changes, update district default
+  // When city changes manually, update district default
   const handleCityChange = (cityName: string) => {
     setCity(cityName);
+    setAutoDetectedLoc(null);
     const cityData = TAIWAN_LOCATIONS.find((c) => c.city === cityName);
     if (cityData && cityData.districts.length > 0) {
       const newDist = cityData.districts[0].name;
       setDistrict(newDist);
-      if (mapUrl.trim()) {
-        autoResolveCoordinates(mapUrl, name, cityName, newDist);
-      }
     }
   };
 
   const handleDistrictChange = (newDist: string) => {
     setDistrict(newDist);
-    if (mapUrl.trim()) {
-      autoResolveCoordinates(mapUrl, name, city, newDist);
-    }
+    setAutoDetectedLoc(null);
   };
 
   // Live Fetch OpenGraph Thumbnail from Food URL
@@ -372,7 +407,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block font-bold text-slate-800 text-sm">
-                Google 地圖連結 <span className="text-slate-400 font-normal">(選填，支援所有格式)</span>
+                Google 地圖連結 <span className="text-slate-400 font-normal">(選填，貼上後自動帶入縣市與行政區)</span>
               </label>
               <button
                 type="button"
@@ -398,7 +433,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             {resolvingMap && (
               <p className="text-[11px] text-orange-600 font-semibold mt-1.5 flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                正在自動解析 Google 地圖圖釘精確座標...
+                正在自動解析 Google 地圖店家座標與行政區域...
               </p>
             )}
             {coordSuccessMsg && !resolvingMap && (
@@ -453,16 +488,26 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             )}
           </div>
 
-          {/* 縣市 & 行政區連動 */}
+          {/* 縣市 & 行政區連動 (支援 Google 地圖自動偵測帶入，亦可手動點選) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-slate-800 mb-1 text-sm">
-                所在縣市 <span className="text-orange-600">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-800 text-sm">
+                  所在縣市 <span className="text-orange-600">*</span>
+                </label>
+                {autoDetectedLoc && (
+                  <span className="text-[10px] text-green-700 bg-green-50 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                    <Sparkles className="w-2.5 h-2.5 text-green-600" />
+                    自動帶入
+                  </span>
+                )}
+              </div>
               <select
                 value={city}
                 onChange={(e) => handleCityChange(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-sm"
+                className={`w-full px-3 py-2.5 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-sm transition-all ${
+                  autoDetectedLoc ? 'border-green-400 bg-green-50/20' : 'border-slate-300'
+                }`}
               >
                 {TAIWAN_LOCATIONS.map((c) => (
                   <option key={c.city} value={c.city}>
@@ -473,13 +518,23 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-800 mb-1 text-sm">
-                行政區 <span className="text-orange-600">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-800 text-sm">
+                  行政區 <span className="text-orange-600">*</span>
+                </label>
+                {autoDetectedLoc && (
+                  <span className="text-[10px] text-green-700 bg-green-50 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                    <Sparkles className="w-2.5 h-2.5 text-green-600" />
+                    自動帶入
+                  </span>
+                )}
+              </div>
               <select
                 value={district}
                 onChange={(e) => handleDistrictChange(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-sm"
+                className={`w-full px-3 py-2.5 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-medium text-sm transition-all ${
+                  autoDetectedLoc ? 'border-green-400 bg-green-50/20' : 'border-slate-300'
+                }`}
               >
                 {districtList.map((d) => (
                   <option key={d.name} value={d.name}>
