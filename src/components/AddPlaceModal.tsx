@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, AlertCircle, Utensils, Navigation, Check, Locate, Edit2 } from 'lucide-react';
+import { X, MapPin, AlertCircle, Utensils, Navigation, Check, Locate, Edit2, Image as ImageIcon } from 'lucide-react';
 import { Place } from '../types';
 import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
 import { extractCoordsFromUrl, resolveGoogleMapsShortlink, geocodePlace } from '../utils/geocoding';
+import { fetchLinkThumbnail } from '../utils/linkPreview';
 
 interface PlaceModalProps {
   isOpen: boolean;
@@ -34,6 +35,10 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
   const [resolvingMap, setResolvingMap] = useState(false);
   const [coordSuccessMsg, setCoordSuccessMsg] = useState<string | null>(null);
 
+  // Real-time thumbnail preview
+  const [previewImage, setPreviewImage] = useState<string>('');
+  const [fetchingImage, setFetchingImage] = useState(false);
+
   const isEditing = !!initialData;
 
   useEffect(() => {
@@ -45,6 +50,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       setDistrict(initialData.district || '中正區');
       setCategory(initialData.category || '經典小吃');
       setNote(initialData.note || '');
+      setPreviewImage(initialData.image_url || '');
       if (initialData.latitude !== null && initialData.longitude !== null && initialData.latitude !== undefined && initialData.longitude !== undefined) {
         setCustomLat(String(initialData.latitude));
         setCustomLng(String(initialData.longitude));
@@ -62,6 +68,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       setDistrict('中正區');
       setCategory('經典小吃');
       setNote('');
+      setPreviewImage('');
       setCustomLat('');
       setCustomLng('');
       setCoordSuccessMsg(null);
@@ -150,33 +157,23 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     }
   };
 
-  // Helper: Extract thumbnail from food_url
-  const getThumbnailFromFoodUrl = (url: string, cat: string) => {
-    if (!url) return '';
-
-    if (/\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i.test(url)) {
-      return url;
+  // Live Fetch OpenGraph Thumbnail from Food URL (Linklook style)
+  const handleFoodUrlChange = async (urlStr: string, cat: string) => {
+    setFoodUrl(urlStr);
+    if (!urlStr.trim()) {
+      setPreviewImage('');
+      return;
     }
 
-    const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-    if (ytMatch && ytMatch[1]) {
-      return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+    setFetchingImage(true);
+    try {
+      const img = await fetchLinkThumbnail(urlStr.trim(), cat);
+      setPreviewImage(img);
+    } catch {
+      // Fallback handled inside fetchLinkThumbnail
+    } finally {
+      setFetchingImage(false);
     }
-
-    const categoryImages: { [key: string]: string } = {
-      '經典小吃': 'https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=800&auto=format&fit=crop&q=80',
-      '傳統麵食': 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&auto=format&fit=crop&q=80',
-      '海鮮熱炒': 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=800&auto=format&fit=crop&q=80',
-      '火鍋鍋物': 'https://images.unsplash.com/photo-1547928576-a4a33237cbc3?w=800&auto=format&fit=crop&q=80',
-      '早午餐/豆漿': 'https://images.unsplash.com/photo-1625813506062-0aeb1d7a094b?w=800&auto=format&fit=crop&q=80',
-      '甜品冰品': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800&auto=format&fit=crop&q=80',
-      '咖啡茶飲': 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80',
-      '夜市必吃': 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
-      '家庭聚餐': 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=800&auto=format&fit=crop&q=80',
-      '其他': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80',
-    };
-
-    return categoryImages[cat] || categoryImages['經典小吃'];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -226,7 +223,11 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       }
     }
 
-    const autoImageUrl = getThumbnailFromFoodUrl(foodUrl.trim(), category);
+    // Extract OpenGraph / Linklook thumbnail
+    let finalImageUrl = previewImage;
+    if (!finalImageUrl) {
+      finalImageUrl = await fetchLinkThumbnail(foodUrl.trim(), category);
+    }
 
     try {
       if (isEditing && initialData) {
@@ -235,7 +236,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
           name: name.trim(),
           food_url: foodUrl.trim(),
           map_url: mapUrl.trim(),
-          image_url: autoImageUrl,
+          image_url: finalImageUrl,
           city,
           district,
           category,
@@ -248,7 +249,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
           name: name.trim(),
           food_url: foodUrl.trim(),
           map_url: mapUrl.trim(),
-          image_url: autoImageUrl,
+          image_url: finalImageUrl,
           city,
           district,
           category,
@@ -329,15 +330,40 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
                 type="url"
                 required
                 value={foodUrl}
-                onChange={(e) => setFoodUrl(e.target.value)}
+                onChange={(e) => handleFoodUrlChange(e.target.value, category)}
                 placeholder="https://... 貼上食記分享網址、IG 或部落格連結"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm"
               />
               <Utensils className="w-5 h-5 text-orange-500 absolute left-3 top-1/2 -translate-y-1/2" />
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              ✨ 系統會自動從此美食連結中抓取縮圖並展示在圖卡上，複製按鈕亦會複製此美食連結。
-            </p>
+
+            {/* 抓取美食連結縮圖狀態與即時預覽 */}
+            {fetchingImage && (
+              <p className="text-[11px] text-orange-600 font-semibold mt-1.5 flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                正在自動解析網址縮圖 (OpenGraph / IG / 文章預覽)...
+              </p>
+            )}
+
+            {previewImage && !fetchingImage && (
+              <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+                <img
+                  src={previewImage}
+                  alt="美食縮圖預覽"
+                  className="w-14 h-14 object-cover rounded-lg border border-slate-200 shadow-sm"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
+                  }}
+                />
+                <div>
+                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
+                    成功取得美食文章縮圖
+                  </p>
+                  <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">將直接顯示於地圖圖卡與美食清單上</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Google 地圖連結 (非必填) */}
