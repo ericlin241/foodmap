@@ -346,22 +346,55 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             )}
 
             {previewImage && !fetchingImage && (
-              <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
-                <img
-                  src={previewImage}
-                  alt="美食縮圖預覽"
-                  className="w-14 h-14 object-cover rounded-lg border border-slate-200 shadow-sm"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
-                  }}
-                />
-                <div>
-                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
-                    成功取得美食文章縮圖
-                  </p>
-                  <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">將直接顯示於地圖圖卡與美食清單上</p>
+              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={previewImage}
+                    alt="美食縮圖預覽"
+                    className="w-14 h-14 object-cover rounded-lg border border-slate-200 shadow-sm"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
+                    }}
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
+                      已設定美食代表縮圖
+                    </p>
+                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">將直接顯示於地圖圖卡與美食清單上</p>
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const customImg = prompt('請貼上自訂照片網址 (例如 IG 照片或食記圖片網址)：', previewImage);
+                    if (customImg && customImg.trim()) {
+                      setPreviewImage(customImg.trim());
+                    }
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200 transition-all shrink-0"
+                >
+                  換一張圖
+                </button>
+              </div>
+            )}
+
+            {!previewImage && !fetchingImage && (
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">離線時無法連外讀取 OpenGraph</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const customImg = prompt('請貼上自訂照片網址：');
+                    if (customImg && customImg.trim()) {
+                      setPreviewImage(customImg.trim());
+                    }
+                  }}
+                  className="text-[11px] text-orange-600 hover:underline font-bold"
+                >
+                  ＋ 手動貼上自訂圖片網址
+                </button>
               </div>
             )}
           </div>
