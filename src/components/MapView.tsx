@@ -59,10 +59,10 @@ function MapFlyController({
       if (isMobile) {
         // On mobile, the top is occupied by the floating place card (~240px)
         // and the bottom is occupied by the elevated bottom navigation bar (~75px).
-        // To place the pin exactly in the vertical center of the visible area between the card bottom and navigation top,
-        // we offset the map center downward by ~80px.
+        // To place the pin exactly in the vertical center of the remaining open map space between the card bottom and navigation top,
+        // we shift the center upward (y - 145) so the marker descends into the clear visual gap.
         const point = map.project(targetLatLng, zoomLevel);
-        const offsetPoint = L.point(point.x, point.y + 75);
+        const offsetPoint = L.point(point.x, point.y - 145);
         const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
         map.setView(offsetLatLng, zoomLevel, { animate: true });
       } else {
