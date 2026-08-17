@@ -4,7 +4,6 @@ import { Place } from '../types';
 const STORAGE_KEY = 'foodmap_places_v2_clean';
 
 // Global Cloudflare D1 Serverless API Base URL
-// Ensures all devices (GitHub Pages, custom domains, mobile) sync to the exact same Cloudflare D1 database in real-time
 const CLOUDFLARE_API_HOST = 'https://foodmap-czr.pages.dev';
 
 export function usePlaces() {
@@ -26,12 +25,17 @@ export function usePlaces() {
   };
 
   // Fetch places in real-time from Cloudflare D1
-  const fetchPlaces = useCallback(async () => {
-    setLoading(true);
+  const fetchPlaces = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
-      const response = await fetch(getApiUrl('/api/places'), {
-        headers: { 'Cache-Control': 'no-cache' },
+      const timestamp = Date.now();
+      const response = await fetch(`${getApiUrl('/api/places')}?_t=${timestamp}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
       });
       if (response.ok) {
         const data = await response.json();
@@ -62,12 +66,20 @@ export function usePlaces() {
     } catch (e) {
       setPlaces([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
+  // Initial load + Real-time Sync Polling every 5 seconds
   useEffect(() => {
     fetchPlaces();
+
+    // Auto-poll every 5 seconds so any device updates immediately reflect on all open tabs/devices
+    const timer = setInterval(() => {
+      fetchPlaces(true);
+    }, 5000);
+
+    return () => clearInterval(timer);
   }, [fetchPlaces]);
 
   // Add Place (Synchronously writes to Cloudflare D1)
@@ -102,6 +114,11 @@ export function usePlaces() {
       return updated;
     });
 
+    // Immediate re-fetch from D1
+    setTimeout(() => {
+      fetchPlaces(true);
+    }, 500);
+
     return { success: true, savedToD1 };
   };
 
@@ -130,6 +147,10 @@ export function usePlaces() {
       return updated;
     });
 
+    setTimeout(() => {
+      fetchPlaces(true);
+    }, 500);
+
     return { success: true, savedToD1 };
   };
 
@@ -150,6 +171,10 @@ export function usePlaces() {
       } catch {}
       return updated;
     });
+
+    setTimeout(() => {
+      fetchPlaces(true);
+    }, 500);
   };
 
   return {
