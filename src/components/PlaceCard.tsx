@@ -22,7 +22,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
   const defaultImg =
     'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
 
-  const hasMap = !!(place.map_url || (place.latitude && place.longitude));
+  const hasMap = !!(place.map_url || (place.latitude !== null && place.longitude !== null && place.latitude !== undefined && place.longitude !== undefined));
 
   const handleOpenNav = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -115,28 +115,34 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
             )}
           </div>
 
-          {/* 底部功能操作列 (導航/看食記、編輯、複製美食連結、刪除) */}
+          {/* 底部功能操作列 (導航、看介紹、編輯、複製美食連結、刪除) */}
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-            {hasMap ? (
-              <button
-                id={`btn-nav-${place.id}`}
-                onClick={handleOpenNav}
-                className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-3 py-1.5 text-xs sm:text-sm"
-                title="開啟 Google 地圖進行即時導航"
-              >
-                <Navigation className="w-4 h-4 fill-white" />
-                <span>導航</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleOpenFoodUrl}
-                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-3 py-1.5 text-xs sm:text-sm"
-                title="開啟原始美食文章或社群分享"
-              >
-                <ExternalLink className="w-4 h-4" />
-                <span>看介紹</span>
-              </button>
-            )}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Google 導航按鈕 (僅有地圖連結時顯示) */}
+              {hasMap && (
+                <button
+                  id={`btn-nav-${place.id}`}
+                  onClick={handleOpenNav}
+                  className="flex items-center gap-1 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-2.5 py-1.5 text-xs"
+                  title="開啟 Google 地圖進行即時導航"
+                >
+                  <Navigation className="w-3.5 h-3.5 fill-white" />
+                  <span>導航</span>
+                </button>
+              )}
+
+              {/* 查看介紹美食連結按鈕 */}
+              {place.food_url && (
+                <button
+                  onClick={handleOpenFoodUrl}
+                  className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-2.5 py-1.5 text-xs"
+                  title="開啟原始美食介紹連結"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>看介紹</span>
+                </button>
+              )}
+            </div>
 
             <div className="flex items-center gap-1.5">
               {/* 編輯店家 */}
@@ -163,7 +169,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
                 title="複製美食食記或文章分享連結"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? '已複製' : '複製連結'}</span>
+                <span>{copied ? '已複製' : '複製美食連結'}</span>
               </button>
 
               {/* 刪除 */}

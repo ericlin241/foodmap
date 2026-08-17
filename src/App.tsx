@@ -98,13 +98,13 @@ export function App() {
     if (place) {
       const hasMap = !!(place.map_url || (place.latitude && place.longitude));
 
-      // 若沒有 Google 地圖連結，地圖區跳出「尚未新增地圖」的小警示，顯示 2 秒
+      // 若沒有 Google 地圖連結，地圖區跳出「尚未新增地圖」的小警示，顯示 3 秒
       if (!hasMap) {
         if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
         setNoMapAlert(`「${place.name}」尚未新增 Google 地圖`);
         alertTimerRef.current = setTimeout(() => {
           setNoMapAlert(null);
-        }, 2000);
+        }, 3000);
       } else {
         setNoMapAlert(null);
       }
