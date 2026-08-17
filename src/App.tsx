@@ -224,13 +224,13 @@ export function App() {
         </main>
       </div>
 
-      {/* 手機版底部導航與懸浮切換列 */}
-      <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-slate-200 p-2 px-4 flex items-center justify-around z-30 shadow-lg">
+      {/* 手機版底部導航與懸浮切換列 (上移並自適應 iPhone Safari 網址列與安全區) */}
+      <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-slate-200 pt-2 px-4 pb-4 sm:pb-5 safe-area-bottom flex items-center justify-around z-30 shadow-2xl">
         {/* 切換為地圖模式 */}
         <button
           id="btn-mobile-tab-map"
           onClick={() => setMobileTab('map')}
-          className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl font-bold transition-all ${
+          className={`flex flex-col items-center gap-1 py-1.5 px-5 rounded-xl font-bold transition-all ${
             mobileTab === 'map' ? 'text-orange-600 bg-orange-50' : 'text-slate-500'
           }`}
         >

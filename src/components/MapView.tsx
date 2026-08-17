@@ -52,9 +52,22 @@ function MapFlyController({
       selectedPlace.latitude !== undefined &&
       selectedPlace.longitude !== undefined
     ) {
-      map.setView([selectedPlace.latitude, selectedPlace.longitude], 16, {
-        animate: true,
-      });
+      const isMobile = window.innerWidth < 768;
+      const zoomLevel = 16;
+      const targetLatLng = L.latLng(selectedPlace.latitude, selectedPlace.longitude);
+
+      if (isMobile) {
+        // On mobile, the top is occupied by the floating place card (~240px)
+        // and the bottom is occupied by the elevated bottom navigation bar (~75px).
+        // To place the pin exactly in the vertical center of the visible area between the card bottom and navigation top,
+        // we offset the map center downward by ~80px.
+        const point = map.project(targetLatLng, zoomLevel);
+        const offsetPoint = L.point(point.x, point.y + 75);
+        const offsetLatLng = map.unproject(offsetPoint, zoomLevel);
+        map.setView(offsetLatLng, zoomLevel, { animate: true });
+      } else {
+        map.setView(targetLatLng, zoomLevel, { animate: true });
+      }
     } else if (centerPosition) {
       map.flyTo([centerPosition.lat, centerPosition.lng], centerPosition.zoom || 13, {
         animate: true,
@@ -192,11 +205,11 @@ export const MapView: React.FC<MapViewProps> = ({
         </div>
       )}
 
-      {/* 固定右上角的美食資訊圖卡 (最上最右留白間距) */}
+      {/* 固定右上角的美食資訊圖卡 (手機版居中精巧留白、電腦版置於右上角) */}
       {selectedPlace && (
-        <div className="absolute top-4 right-4 z-30 w-80 sm:w-96 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="absolute top-3 left-3 right-3 sm:left-auto sm:right-4 z-30 sm:w-96 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
           {/* 照片區塊 (使用美食連結的縮圖，無縮圖顯示「無圖片」) */}
-          <div className="relative h-40 sm:h-44 w-full bg-slate-100 overflow-hidden">
+          <div className="relative h-36 sm:h-44 w-full bg-slate-100 overflow-hidden">
             <AutoFoodImage place={selectedPlace} />
             {/* 關閉按鈕 */}
             <button

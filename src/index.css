@@ -59,6 +59,13 @@ body.senior-mode select {
   overflow: visible !important;
 }
 
+/* iOS Safari Safe Area Bottom Padding */
+.safe-area-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem)) !important;
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+
 /* Custom Gentle Bounce Animation for Selected Marker */
 @keyframes gentlePinBounce {
   0%, 100% {
