@@ -30,10 +30,6 @@ export function App() {
   const [isWheelModalOpen, setIsWheelModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
 
-  // Map Picking State
-  const [isPickingLocation, setIsPickingLocation] = useState(false);
-  const [pickedCoords, setPickedCoords] = useState<{ lat: number; lng: number } | null>(null);
-
   // Apply Senior Mode class to body
   useEffect(() => {
     if (seniorMode) {
@@ -94,21 +90,6 @@ export function App() {
     }
   };
 
-  const handleStartPickingLocation = () => {
-    setIsAddModalOpen(false);
-    setIsPickingLocation(true);
-    // Switch to map view on mobile
-    if (window.innerWidth < 768) {
-      setMobileTab('map');
-    }
-  };
-
-  const handleLocationPicked = (lat: number, lng: number) => {
-    setPickedCoords({ lat, lng });
-    setIsPickingLocation(false);
-    setIsAddModalOpen(true);
-  };
-
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100 font-sans">
       {/* 頂部導航列 */}
@@ -116,7 +97,6 @@ export function App() {
         seniorMode={seniorMode}
         setSeniorMode={setSeniorMode}
         onOpenAddModal={() => {
-          setPickedCoords(null);
           setIsAddModalOpen(true);
         }}
         onOpenWheelModal={() => setIsWheelModalOpen(true)}
@@ -216,9 +196,6 @@ export function App() {
             selectedPlace={selectedPlace}
             onSelectPlace={handleSelectPlace}
             centerPosition={mapCenterPosition}
-            isPickingLocation={isPickingLocation}
-            pickedPosition={pickedCoords}
-            onLocationPicked={handleLocationPicked}
             seniorMode={seniorMode}
           />
         </main>
@@ -242,7 +219,6 @@ export function App() {
         <button
           id="btn-mobile-fab-add"
           onClick={() => {
-            setPickedCoords(null);
             setIsAddModalOpen(true);
           }}
           className="bg-gradient-to-r from-orange-600 to-amber-500 text-white p-3.5 -mt-6 rounded-full shadow-xl border-4 border-white active:scale-95 transition-all flex items-center justify-center"
@@ -270,8 +246,6 @@ export function App() {
         onClose={() => setIsAddModalOpen(false)}
         onAddPlace={addPlace}
         seniorMode={seniorMode}
-        pickedCoords={pickedCoords}
-        onStartPickingLocation={handleStartPickingLocation}
       />
 
       {/* 隨機美食轉盤抽籤彈窗 */}
