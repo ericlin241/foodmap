@@ -1,18 +1,18 @@
-import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import React, { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Place } from '../types';
-import { Navigation, MapPin } from 'lucide-react';
+import { Navigation, MapPin, X, MessageCircle, Copy, Check } from 'lucide-react';
 
-// Custom Marker Icons (Super clear, distinct orange pin with food emoji)
+// Custom Marker Icons (Pinned precisely at center-bottom tip)
 const createCustomIcon = (isSelected: boolean) => {
-  const width = isSelected ? 46 : 38;
-  const height = isSelected ? 58 : 48;
+  const width = isSelected ? 48 : 38;
+  const height = isSelected ? 60 : 48;
   const pinBg = isSelected ? '#dc2626' : '#ea580c';
   const strokeColor = '#ffffff';
 
   const svgHtml = `
-    <div style="width: ${width}px; height: ${height}px; position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.4));">
+    <div style="width: ${width}px; height: ${height}px; position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 5px 12px rgba(0,0,0,0.45));">
       <svg width="${width}" height="${height}" viewBox="0 0 38 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="position: absolute; top: 0; left: 0;">
         <path d="M19 0C8.50659 0 0 8.50659 0 19C0 31.5 19 48 19 48C19 48 38 31.5 38 19C38 8.50659 29.4934 0 19 0Z" fill="${pinBg}" stroke="${strokeColor}" stroke-width="2.5"/>
         <circle cx="19" cy="18" r="13.5" fill="#ffffff"/>
@@ -27,12 +27,11 @@ const createCustomIcon = (isSelected: boolean) => {
     html: svgHtml,
     className: isSelected ? 'custom-marker-active' : '',
     iconSize: [width, height],
-    iconAnchor: [width / 2, height],
-    popupAnchor: [0, -height + 4],
+    iconAnchor: [width / 2, height], // 正下方尖端對齊經緯度，保證正中間不偏移
   });
 };
 
-// Component to handle smooth flyTo and auto-centering
+// Component to handle smooth flyTo and exact map centering
 function MapFlyController({
   selectedPlace,
   centerPosition,
@@ -46,14 +45,14 @@ function MapFlyController({
 
   useEffect(() => {
     if (selectedPlace) {
-      map.flyTo([selectedPlace.latitude, selectedPlace.longitude], 16, {
+      // 點選店家時：將地圖視角正正對準經緯度，讓圖釘完全處於畫面正中間
+      map.setView([selectedPlace.latitude, selectedPlace.longitude], 16, {
         animate: true,
-        duration: 1.0,
       });
     } else if (centerPosition) {
       map.flyTo([centerPosition.lat, centerPosition.lng], centerPosition.zoom || 13, {
         animate: true,
-        duration: 1.0,
+        duration: 0.8,
       });
     } else if (places.length > 0) {
       const validPlaces = places.filter((p) => !isNaN(p.latitude) && !isNaN(p.longitude));
@@ -65,84 +64,6 @@ function MapFlyController({
   }, [selectedPlace, centerPosition, places, map]);
 
   return null;
-}
-
-// Single Marker with Ref for Auto Popup Opening
-function MarkerItem({
-  place,
-  isSelected,
-  onSelectPlace,
-  handleNav,
-}: {
-  place: Place;
-  isSelected: boolean;
-  onSelectPlace: (place: Place) => void;
-  handleNav: (place: Place) => void;
-}) {
-  const markerRef = useRef<L.Marker>(null);
-
-  useEffect(() => {
-    if (isSelected && markerRef.current) {
-      markerRef.current.openPopup();
-    }
-  }, [isSelected]);
-
-  return (
-    <Marker
-      ref={markerRef}
-      position={[place.latitude, place.longitude]}
-      icon={createCustomIcon(isSelected)}
-      eventHandlers={{
-        click: () => onSelectPlace(place),
-      }}
-    >
-      <Popup className="food-popup">
-        <div className="w-64 sm:w-72 overflow-hidden bg-white">
-          {place.image_url && (
-            <div className="h-32 w-full overflow-hidden relative">
-              <img
-                src={place.image_url}
-                alt={place.name}
-                className="w-full h-full object-cover"
-              />
-              {place.category && (
-                <span className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[11px] font-semibold px-2 py-0.5 rounded">
-                  {place.category}
-                </span>
-              )}
-            </div>
-          )}
-
-          <div className="p-3.5">
-            <div className="flex items-start justify-between gap-1">
-              <h4 className="font-bold text-slate-900 text-base">{place.name}</h4>
-            </div>
-
-            <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-              <MapPin className="w-3.5 h-3.5 text-orange-500" />
-              {place.city} {place.district}
-            </p>
-
-            {place.note && (
-              <p className="text-xs text-slate-700 bg-amber-50/80 p-2 rounded-lg mt-2 border border-amber-100 line-clamp-3">
-                💬 {place.note}
-              </p>
-            )}
-
-            <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-              <button
-                onClick={() => handleNav(place)}
-                className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-              >
-                <Navigation className="w-3.5 h-3.5 fill-white" />
-                Google 地圖導航
-              </button>
-            </div>
-          </div>
-        </div>
-      </Popup>
-    </Marker>
-  );
 }
 
 interface MapViewProps {
@@ -159,6 +80,10 @@ export const MapView: React.FC<MapViewProps> = ({
   centerPosition,
 }) => {
   const defaultCenter = { lat: 23.9738, lng: 120.982, zoom: 8 };
+  const [copied, setCopied] = React.useState(false);
+
+  const defaultImg =
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
 
   const handleNav = (place: Place) => {
     if (place.url) {
@@ -169,6 +94,19 @@ export const MapView: React.FC<MapViewProps> = ({
       )}`;
       window.open(googleMapsUrl, '_blank');
     }
+  };
+
+  const handleShareLine = (place: Place) => {
+    const text = `🍲 私房推薦美食【${place.name}】\n📍 位置：${place.city}${place.district}\n📝 推薦：${place.note || '超好吃必點！'}\n🔗 地圖：${place.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`}`;
+    const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+    window.open(lineUrl, '_blank');
+  };
+
+  const handleCopy = (place: Place) => {
+    const text = `【${place.name}】(${place.city}${place.district})\n推薦備註：${place.note || '無'}\n連結：${place.url || ''}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -195,16 +133,97 @@ export const MapView: React.FC<MapViewProps> = ({
           const isSelected = selectedPlace?.id === place.id;
 
           return (
-            <MarkerItem
+            <Marker
               key={place.id}
-              place={place}
-              isSelected={isSelected}
-              onSelectPlace={onSelectPlace}
-              handleNav={handleNav}
+              position={[place.latitude, place.longitude]}
+              icon={createCustomIcon(isSelected)}
+              eventHandlers={{
+                click: () => onSelectPlace(place),
+              }}
             />
           );
         })}
       </MapContainer>
+
+      {/* 固定右上角的美食資訊圖卡 (最上最右留白間距) */}
+      {selectedPlace && (
+        <div className="absolute top-4 right-4 z-30 w-80 sm:w-96 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
+          {/* 照片區塊 */}
+          <div className="relative h-40 sm:h-44 w-full bg-slate-100 overflow-hidden">
+            <img
+              src={selectedPlace.image_url || defaultImg}
+              alt={selectedPlace.name}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = defaultImg;
+              }}
+              className="w-full h-full object-cover"
+            />
+            {/* 關閉按鈕 */}
+            <button
+              onClick={() => onSelectPlace(null)}
+              className="absolute top-2.5 right-2.5 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 backdrop-blur-md shadow transition-all active:scale-95"
+              title="關閉卡片"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* 類別標籤 */}
+            {selectedPlace.category && (
+              <span className="absolute bottom-2.5 left-2.5 bg-orange-600/90 text-white text-xs font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm shadow">
+                {selectedPlace.category}
+              </span>
+            )}
+          </div>
+
+          {/* 內容區塊 */}
+          <div className="p-4 space-y-3">
+            <div>
+              <h3 className="font-black text-slate-900 text-lg sm:text-xl leading-tight">
+                {selectedPlace.name}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1.5 mt-1 font-medium">
+                <MapPin className="w-4 h-4 text-orange-500 shrink-0" />
+                {selectedPlace.city} • {selectedPlace.district}
+              </p>
+            </div>
+
+            {/* 私房備註 */}
+            {selectedPlace.note && (
+              <div className="p-2.5 bg-amber-50/80 rounded-xl border border-amber-200/70 text-xs sm:text-sm text-slate-700 leading-relaxed max-h-24 overflow-y-auto">
+                💬 <span className="font-medium">{selectedPlace.note}</span>
+              </div>
+            )}
+
+            {/* 功能按鈕列 */}
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <button
+                onClick={() => handleNav(selectedPlace)}
+                className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
+              >
+                <Navigation className="w-4 h-4 fill-white" />
+                <span>Google 地圖導航</span>
+              </button>
+
+              <button
+                onClick={() => handleShareLine(selectedPlace)}
+                className="p-2.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
+                title="分享到 LINE"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">LINE</span>
+              </button>
+
+              <button
+                onClick={() => handleCopy(selectedPlace)}
+                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium flex items-center gap-1 transition-all"
+                title="複製店家資訊"
+              >
+                {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
