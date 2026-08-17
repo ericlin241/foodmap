@@ -26,8 +26,8 @@ export function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
 
-  // UI state
-  const [mobileTab, setMobileTab] = useState<'map' | 'list'>('map');
+  // UI state (手機版預設載入清單檢視畫面)
+  const [mobileTab, setMobileTab] = useState<'map' | 'list'>('list');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [noMapAlert, setNoMapAlert] = useState<string | null>(null);
   const alertTimerRef = useRef<any>(null);
