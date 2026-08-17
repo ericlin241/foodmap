@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFDF9" />
+      <stop offset="50%" stop-color="#FFF8F0" />
+      <stop offset="100%" stop-color="#FEF3E2" />
+    </linearGradient>
+
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EA580C" />
+      <stop offset="100%" stop-color="#F97316" />
+    </linearGradient>
+
+    <linearGradient id="yellowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#FBBF24" />
+    </linearGradient>
+
+    <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#EA580C" flood-opacity="0.07" />
+    </filter>
+  </defs>
+
+  <!-- Full 1200x1200 Background -->
+  <rect width="1200" height="1200" fill="url(#bg)" />
+
+  <!-- Ambient Minimal Japanese Geometric Circles -->
+  <circle cx="1100" cy="400" r="240" fill="#FED7AA" opacity="0.35" />
+  <circle cx="1150" cy="350" r="150" fill="#FDE68A" opacity="0.4" />
+  <circle cx="80" cy="800" r="220" fill="#FFEDD5" opacity="0.45" />
+
+  <!-- Content Block Centered at Y=600 -->
+  <!-- Content Left -->
+  <g transform="translate(100, 390)">
+    <!-- Top Pill Badge -->
+    <g>
+      <rect width="200" height="44" rx="22" fill="#FFF7ED" stroke="#FFEDD5" stroke-width="1.8" />
+      <circle cx="24" cy="22" r="6" fill="#F97316" />
+      <text x="42" y="28" font-family="-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif" font-size="16" font-weight="800" fill="#C2410C" letter-spacing="1.5">TAIWAN FOOD</text>
+    </g>
+
+    <!-- Main Title: 台灣美食地圖 -->
+    <text x="0" y="145" font-family="-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif" font-size="68" font-weight="900" fill="#1E293B" letter-spacing="2.5">台灣美食地圖</text>
+
+    <!-- Accent underline bar -->
+    <rect x="0" y="175" width="100" height="8" rx="4" fill="url(#orangeGrad)" />
+    <rect x="112" y="175" width="32" height="8" rx="4" fill="url(#yellowGrad)" />
+
+    <!-- Description: 景點食記永久收藏 -->
+    <text x="0" y="260" font-family="-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif" font-size="32" font-weight="600" fill="#64748B" letter-spacing="2">景點食記永久收藏</text>
+
+    <!-- Feature Tags -->
+    <g transform="translate(0, 325)">
+      <rect x="0" y="0" width="165" height="50" rx="14" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.5" />
+      <text x="20" y="32" font-family="-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif" font-size="18" font-weight="700" fill="#B45309">📍 私房地圖標記</text>
+
+      <rect x="180" y="0" width="165" height="50" rx="14" fill="#FFF7ED" stroke="#FED7AA" stroke-width="1.5" />
+      <text x="200" y="32" font-family="-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif" font-size="18" font-weight="700" fill="#C2410C">🍜 美食食記預覽</text>
+
+      <rect x="360" y="0" width="165" height="50" rx="14" fill="#FEF2F2" stroke="#FECACA" stroke-width="1.5" />
+      <text x="380" y="32" font-family="-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif" font-size="18" font-weight="700" fill="#B91C1C">✨ 隨機抽籤推薦</text>
+    </g>
+  </g>
+
+  <!-- Illustration Right -->
+  <g transform="translate(780, 380)">
+    <circle cx="180" cy="200" r="170" fill="#FFFFFF" filter="url(#cardShadow)" stroke="#FEEAD1" stroke-width="2.5" />
+    <circle cx="180" cy="200" r="135" fill="#FFF7ED" />
+    <circle cx="180" cy="200" r="105" fill="#FEF3C7" opacity="0.6" />
+
+    <!-- Stylized Minimal Map Pin -->
+    <g transform="translate(125, 80)">
+      <ellipse cx="55" cy="200" rx="44" ry="10" fill="#000000" opacity="0.06" />
+      <path d="M55 0 C24.5 0 0 24.5 0 55 C0 95 55 185 55 185 C55 185 110 95 110 55 C110 24.5 85.5 0 55 0 Z" fill="url(#orangeGrad)" />
+      <circle cx="55" cy="55" r="40" fill="#FFFFFF" />
+      
+      <!-- Steaming Ramen/Gourmet Bowl Icon Vector -->
+      <path d="M30 55 Q30 78 55 78 Q80 78 80 55 Z" fill="#EA580C" />
+      <path d="M26 53 Q55 51 84 53 Q84 57 82 57 Q55 55 28 57 Q26 57 26 53 Z" fill="#F59E0B" />
+      <line x1="26" y1="38" x2="86" y2="50" stroke="#78350F" stroke-width="3.5" stroke-linecap="round" />
+      <path d="M44 28 Q49 21 44 14" stroke="#F97316" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8" />
+      <path d="M55 26 Q60 19 55 12" stroke="#F97316" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8" />
+      <path d="M66 28 Q71 21 66 14" stroke="#F97316" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8" />
+    </g>
+
+    <!-- Floating Badge -->
+    <g transform="translate(195, 305)">
+      <rect width="155" height="52" rx="18" fill="url(#yellowGrad)" />
+      <text x="77.5" y="33" font-family="-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Microsoft JhengHei', sans-serif" font-size="18" font-weight="900" fill="#78350F" text-anchor="middle">探索私房美味 ➔</text>
+    </g>
+  </g>
+</svg>
