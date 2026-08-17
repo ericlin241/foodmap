@@ -9,17 +9,15 @@ import { StatsModal } from './components/StatsModal';
 import { usePlaces } from './hooks/usePlaces';
 import { Place } from './types';
 import { TAIWAN_LOCATIONS } from './data/taiwanDistricts';
-import { Map, List, Plus, Database, AlertCircle, RefreshCw } from 'lucide-react';
+import { Map, List, Plus, AlertCircle } from 'lucide-react';
 
 export function App() {
   const {
     places,
     loading,
-    isD1Connected,
     addPlace,
     updatePlace,
     deletePlace,
-    resetToSampleData,
   } = usePlaces();
 
   // Filters
@@ -146,24 +144,6 @@ export function App() {
         onOpenStatsModal={() => setIsStatsModalOpen(true)}
         totalPlaces={places.length}
       />
-
-      {/* 資料庫連線狀態通知列 (小標示) */}
-      <div className="bg-slate-800 text-slate-300 text-[11px] px-4 py-1 flex items-center justify-between z-20">
-        <div className="flex items-center gap-1.5">
-          <Database className={`w-3 h-3 ${isD1Connected ? 'text-green-400' : 'text-amber-400'}`} />
-          <span>
-            儲存模式：{isD1Connected ? 'Cloudflare D1 雲端資料庫已連線' : '本機 LocalStorage 儲存模式 (離線/本地可用)'}
-          </span>
-        </div>
-        <button
-          onClick={resetToSampleData}
-          className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
-          title="重載台灣精選預設美食範例"
-        >
-          <RefreshCw className="w-2.5 h-2.5" />
-          載入範例資料
-        </button>
-      </div>
 
       {/* 主體區塊：Desktop 雙欄 / Mobile 視圖切換 */}
       <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Place } from '../types';
 import { INITIAL_PLACES } from '../data/initialPlaces';
 
-const STORAGE_KEY = 'foodmap_places_v1';
+const STORAGE_KEY = 'foodmap_places_v2_clean';
 
 export function usePlaces() {
   const [places, setPlaces] = useState<Place[]>([]);
@@ -18,7 +18,7 @@ export function usePlaces() {
       const response = await fetch('/api/places');
       if (response.ok) {
         const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setPlaces(data);
           setIsD1Connected(true);
           setLoading(false);
@@ -35,13 +35,13 @@ export function usePlaces() {
       if (cached) {
         setPlaces(JSON.parse(cached));
       } else {
-        setPlaces(INITIAL_PLACES);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_PLACES));
+        setPlaces([]);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
       }
       setIsD1Connected(false);
     } catch (e) {
       console.error('LocalStorage failed', e);
-      setPlaces(INITIAL_PLACES);
+      setPlaces([]);
     } finally {
       setLoading(false);
     }
