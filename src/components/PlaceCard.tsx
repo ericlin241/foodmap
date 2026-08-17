@@ -20,10 +20,13 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
-  const defaultImg =
-    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
-
-  const hasMap = !!(place.map_url || (place.latitude !== null && place.longitude !== null && place.latitude !== undefined && place.longitude !== undefined));
+  const hasMap = !!(
+    place.map_url ||
+    (place.latitude !== null &&
+      place.longitude !== null &&
+      place.latitude !== undefined &&
+      place.longitude !== undefined)
+  );
 
   const handleOpenNav = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,7 +68,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
       }`}
     >
       <div className="flex flex-col sm:flex-row">
-        {/* 美食照片 (由美食連結取得之縮圖) */}
+        {/* 美食照片 (由美食連結取得之縮圖，無縮圖顯示「無圖片」) */}
         <div className="relative sm:w-36 h-36 sm:h-auto shrink-0 bg-slate-100 overflow-hidden">
           <AutoFoodImage
             place={place}
@@ -87,16 +90,16 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
         </div>
 
         {/* 卡片主要資訊 */}
-        <div className="p-3.5 sm:p-4 flex-1 flex flex-col justify-between">
+        <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between min-w-0">
           <div>
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-black text-slate-900 leading-snug group-hover:text-orange-600 transition-colors text-base sm:text-lg">
+              <h3 className="font-black text-slate-900 leading-snug group-hover:text-orange-600 transition-colors text-base truncate">
                 {place.name}
               </h3>
             </div>
 
             {/* 地區 */}
-            <div className="flex items-center gap-1 text-slate-500 text-xs sm:text-sm mt-1 font-medium">
+            <div className="flex items-center gap-1 text-slate-500 text-xs mt-0.5 font-medium">
               <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0" />
               <span>
                 {place.city} • {place.district}
@@ -105,66 +108,68 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
 
             {/* 私房備註 */}
             {place.note && (
-              <p className="mt-2 text-slate-600 bg-amber-50/70 p-2 rounded-xl border border-amber-100/80 font-normal line-clamp-2 leading-relaxed text-xs sm:text-sm">
+              <p className="mt-1.5 text-slate-600 bg-amber-50/70 p-1.5 px-2 rounded-xl border border-amber-100/80 font-normal line-clamp-1 leading-relaxed text-xs">
                 💬 {place.note}
               </p>
             )}
           </div>
 
-          {/* 底部功能操作列 (導航、看介紹、編輯、複製美食連結、刪除) */}
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
+          {/* 底部功能操作列 (嚴格單行排版：導航 / 介紹 / 編輯 / 複製 / 刪除) */}
+          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-1 flex-nowrap overflow-x-hidden">
+            {/* 左側主要動作：導航、介紹 */}
+            <div className="flex items-center gap-1 shrink-0">
               {/* Google 導航按鈕 (僅有地圖連結時顯示) */}
               {hasMap && (
                 <button
                   id={`btn-nav-${place.id}`}
                   onClick={handleOpenNav}
-                  className="flex items-center gap-1 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-2.5 py-1.5 text-xs"
+                  className="flex items-center gap-1 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-lg shadow-sm hover:shadow active:scale-95 transition-all px-2 py-1 text-xs whitespace-nowrap"
                   title="開啟 Google 地圖進行即時導航"
                 >
-                  <Navigation className="w-3.5 h-3.5 fill-white" />
+                  <Navigation className="w-3 h-3 fill-white" />
                   <span>導航</span>
                 </button>
               )}
 
-              {/* 查看介紹美食連結按鈕 */}
+              {/* 介紹按鈕 (開啟美食連結) */}
               {place.food_url && (
                 <button
                   onClick={handleOpenFoodUrl}
-                  className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-2.5 py-1.5 text-xs"
+                  className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg shadow-sm hover:shadow active:scale-95 transition-all px-2 py-1 text-xs whitespace-nowrap"
                   title="開啟原始美食介紹連結"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>看介紹</span>
+                  <ExternalLink className="w-3 h-3" />
+                  <span>介紹</span>
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-1.5">
+            {/* 右側輔助動作：編輯、複製、刪除 */}
+            <div className="flex items-center gap-1 shrink-0">
               {/* 編輯店家 */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit(place);
                 }}
-                className="p-1.5 sm:px-2 sm:py-1.5 bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all border border-slate-200/80"
+                className="px-2 py-1 bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-600 rounded-lg text-xs font-semibold flex items-center gap-0.5 transition-all border border-slate-200/80 whitespace-nowrap"
                 title="編輯店家資訊"
               >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">編輯</span>
+                <Edit3 className="w-3 h-3" />
+                <span>編輯</span>
               </button>
 
-              {/* 複製「美食連結」 */}
+              {/* 複製美食連結 */}
               <button
                 onClick={handleCopyFoodLink}
-                className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all border ${
+                className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-0.5 transition-all border whitespace-nowrap ${
                   copied
                     ? 'bg-green-50 border-green-300 text-green-700 font-bold'
                     : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600'
                 }`}
-                title="複製美食食記或文章分享連結"
+                title="複製美食文章分享連結"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
                 <span>{copied ? '已複製' : '複製'}</span>
               </button>
 
@@ -176,10 +181,10 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
                     onDelete(place.id);
                   }
                 }}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                 title="刪除此私房地點"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

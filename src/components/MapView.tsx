@@ -45,7 +45,13 @@ function MapFlyController({
   const map = useMap();
 
   useEffect(() => {
-    if (selectedPlace && selectedPlace.latitude !== null && selectedPlace.longitude !== null && selectedPlace.latitude !== undefined && selectedPlace.longitude !== undefined) {
+    if (
+      selectedPlace &&
+      selectedPlace.latitude !== null &&
+      selectedPlace.longitude !== null &&
+      selectedPlace.latitude !== undefined &&
+      selectedPlace.longitude !== undefined
+    ) {
       map.setView([selectedPlace.latitude, selectedPlace.longitude], 16, {
         animate: true,
       });
@@ -56,10 +62,16 @@ function MapFlyController({
       });
     } else if (mapPlaces.length > 0) {
       const validPlaces = mapPlaces.filter(
-        (p) => p.latitude !== null && p.longitude !== null && !isNaN(p.latitude as number) && !isNaN(p.longitude as number)
+        (p) =>
+          p.latitude !== null &&
+          p.longitude !== null &&
+          !isNaN(p.latitude as number) &&
+          !isNaN(p.longitude as number)
       );
       if (validPlaces.length > 0) {
-        const bounds = L.latLngBounds(validPlaces.map((p) => [p.latitude as number, p.longitude as number]));
+        const bounds = L.latLngBounds(
+          validPlaces.map((p) => [p.latitude as number, p.longitude as number])
+        );
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
       }
     }
@@ -88,17 +100,23 @@ export const MapView: React.FC<MapViewProps> = ({
   const defaultCenter = { lat: 23.9738, lng: 120.982, zoom: 8 };
   const [copied, setCopied] = React.useState(false);
 
-  const defaultImg =
-    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
-
   // Filter only places with valid map coordinates for Leaflet Markers (always kept rendered)
-  const mapPlaces = React.useMemo(() => {
+  const mapPlaces = useMemo(() => {
     return places.filter(
-      (p) => p.latitude !== null && p.longitude !== null && p.latitude !== undefined && p.longitude !== undefined && !isNaN(p.latitude) && !isNaN(p.longitude)
+      (p) =>
+        p.latitude !== null &&
+        p.longitude !== null &&
+        p.latitude !== undefined &&
+        p.longitude !== undefined &&
+        !isNaN(p.latitude) &&
+        !isNaN(p.longitude)
     );
   }, [places]);
 
-  const hasMap = !!(selectedPlace && (selectedPlace.map_url || (selectedPlace.latitude && selectedPlace.longitude)));
+  const hasMap = !!(
+    selectedPlace &&
+    (selectedPlace.map_url || (selectedPlace.latitude && selectedPlace.longitude))
+  );
 
   const handleNav = (place: Place) => {
     if (place.map_url) {
@@ -177,7 +195,7 @@ export const MapView: React.FC<MapViewProps> = ({
       {/* 固定右上角的美食資訊圖卡 (最上最右留白間距) */}
       {selectedPlace && (
         <div className="absolute top-4 right-4 z-30 w-80 sm:w-96 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
-          {/* 照片區塊 (使用美食連結的縮圖) */}
+          {/* 照片區塊 (使用美食連結的縮圖，無縮圖顯示「無圖片」) */}
           <div className="relative h-40 sm:h-44 w-full bg-slate-100 overflow-hidden">
             <AutoFoodImage place={selectedPlace} />
             {/* 關閉按鈕 */}
@@ -230,38 +248,36 @@ export const MapView: React.FC<MapViewProps> = ({
               </div>
             )}
 
-            {/* 功能按鈕列 (導航、看介紹、複製美食連結) */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 flex-1 flex-wrap">
-                {/* 導航按鈕 (僅在有地圖連結時顯示) */}
-                {hasMap && (
-                  <button
-                    onClick={() => handleNav(selectedPlace)}
-                    className="py-2.5 px-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all"
-                    title="開啟 Google 地圖導航"
-                  >
-                    <Navigation className="w-4 h-4 fill-white" />
-                    <span>導航</span>
-                  </button>
-                )}
+            {/* 功能按鈕列 (右上角填滿整排橫排、無空格：導航 / 介紹 / 複製) */}
+            <div className="pt-2 border-t border-slate-100 flex items-center gap-2 w-full">
+              {/* 導航按鈕 (僅在有地圖連結時顯示，均分寬度) */}
+              {hasMap && (
+                <button
+                  onClick={() => handleNav(selectedPlace)}
+                  className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all"
+                  title="開啟 Google 地圖導航"
+                >
+                  <Navigation className="w-4 h-4 fill-white" />
+                  <span>導航</span>
+                </button>
+              )}
 
-                {/* 查看介紹美食連結按鈕 */}
-                {selectedPlace.food_url && (
-                  <button
-                    onClick={() => handleOpenFoodUrl(selectedPlace)}
-                    className="py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all"
-                    title="開啟原始美食介紹連結"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    <span>看介紹</span>
-                  </button>
-                )}
-              </div>
+              {/* 介紹按鈕 (均分寬度) */}
+              {selectedPlace.food_url && (
+                <button
+                  onClick={() => handleOpenFoodUrl(selectedPlace)}
+                  className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all"
+                  title="開啟原始美食介紹連結"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>介紹</span>
+                </button>
+              )}
 
-              {/* 複製美食連結按鈕 */}
+              {/* 複製美食連結按鈕 (均分寬度，填滿橫排) */}
               <button
                 onClick={() => handleCopyFoodLink(selectedPlace)}
-                className={`py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 border transition-all ${
+                className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1 border transition-all ${
                   copied
                     ? 'bg-green-50 border-green-300 text-green-700 font-bold'
                     : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
