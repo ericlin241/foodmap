@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { FilterBar } from './components/FilterBar';
 import { PlaceCard } from './components/PlaceCard';
@@ -31,6 +31,8 @@ export function App() {
   // UI state
   const [mobileTab, setMobileTab] = useState<'map' | 'list'>('map');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+  const [noMapAlert, setNoMapAlert] = useState<string | null>(null);
+  const alertTimerRef = useRef<any>(null);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,7 +63,7 @@ export function App() {
       if (selectedDistrict && place.district !== selectedDistrict) return false;
       // Category filter
       if (selectedCategory && place.category !== selectedCategory) return false;
-      // Search keyword filter (matches name, note, category, district)
+      // Search keyword filter
       if (searchKeyword.trim()) {
         const kw = searchKeyword.toLowerCase();
         const matchName = place.name.toLowerCase().includes(kw);
@@ -74,7 +76,7 @@ export function App() {
     });
   }, [places, selectedCity, selectedDistrict, selectedCategory, searchKeyword]);
 
-  // Places for Random Wheel: drawn specifically from currently selected City/District
+  // Places for Random Wheel
   const wheelCandidatePlaces = useMemo(() => {
     return places.filter((place) => {
       if (selectedCity && place.city !== selectedCity) return false;
@@ -92,9 +94,25 @@ export function App() {
 
   const handleSelectPlace = (place: Place | null) => {
     setSelectedPlace(place);
-    // On mobile, if in list view, switch to map view to show selection
-    if (place && window.innerWidth < 768) {
-      setMobileTab('map');
+
+    if (place) {
+      const hasMap = !!(place.map_url || (place.latitude && place.longitude));
+
+      // 若沒有 Google 地圖連結，地圖區跳出「尚未新增地圖」的小警示，顯示 2 秒
+      if (!hasMap) {
+        if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+        setNoMapAlert(`「${place.name}」尚未新增 Google 地圖`);
+        alertTimerRef.current = setTimeout(() => {
+          setNoMapAlert(null);
+        }, 2000);
+      } else {
+        setNoMapAlert(null);
+      }
+
+      // On mobile, if in list view, switch to map view to show selection
+      if (window.innerWidth < 768) {
+        setMobileTab('map');
+      }
     }
   };
 
@@ -221,6 +239,7 @@ export function App() {
             onSelectPlace={handleSelectPlace}
             onEditPlace={handleOpenEditModal}
             centerPosition={mapCenterPosition}
+            noMapAlert={noMapAlert}
           />
         </main>
       </div>
@@ -273,7 +292,7 @@ export function App() {
         initialData={editingPlace}
       />
 
-      {/* 隨機美食轉盤抽籤彈窗 (限定當前選取縣市/行政區) */}
+      {/* 隨機美食轉盤抽籤彈窗 */}
       <RandomWheel
         isOpen={isWheelModalOpen}
         onClose={() => setIsWheelModalOpen(false)}

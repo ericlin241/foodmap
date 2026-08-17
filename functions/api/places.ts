@@ -17,7 +17,23 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       'SELECT * FROM places ORDER BY created_at DESC'
     ).all();
 
-    return new Response(JSON.stringify(results || []), {
+    // Map backwards compatibility if needed
+    const places = (results || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      food_url: row.food_url || row.url || '',
+      map_url: row.map_url || (row.latitude ? row.url : '') || '',
+      image_url: row.image_url || '',
+      city: row.city,
+      district: row.district,
+      category: row.category || '經典小吃',
+      note: row.note || '',
+      latitude: row.latitude !== null && !isNaN(row.latitude) ? Number(row.latitude) : null,
+      longitude: row.longitude !== null && !isNaN(row.longitude) ? Number(row.longitude) : null,
+      created_at: row.created_at,
+    }));
+
+    return new Response(JSON.stringify(places), {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
@@ -46,29 +62,30 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     const id = data.id || 'place-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
     const name = data.name;
-    const url = data.url || '';
+    const food_url = data.food_url || '';
+    const map_url = data.map_url || '';
     const image_url = data.image_url || '';
     const city = data.city || '';
     const district = data.district || '';
     const category = data.category || '經典小吃';
     const note = data.note || '';
-    const latitude = Number(data.latitude);
-    const longitude = Number(data.longitude);
-    const rating = Number(data.rating || 5.0);
+    const latitude = data.latitude !== null && data.latitude !== undefined && !isNaN(data.latitude) ? Number(data.latitude) : null;
+    const longitude = data.longitude !== null && data.longitude !== undefined && !isNaN(data.longitude) ? Number(data.longitude) : null;
     const created_at = data.created_at || new Date().toISOString();
 
-    if (!name || !city || isNaN(latitude) || isNaN(longitude)) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    if (!name || !food_url || !city) {
+      return new Response(JSON.stringify({ error: 'Missing required fields (name, food_url, city)' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
+    // Support both old and new schema
     await env.DB.prepare(
-      `INSERT INTO places (id, name, url, image_url, city, district, category, note, latitude, longitude, rating, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO places (id, name, url, image_url, city, district, category, note, latitude, longitude, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(id, name, url, image_url, city, district, category, note, latitude, longitude, rating, created_at)
+      .bind(id, name, food_url, image_url, city, district, category, note, latitude, longitude, created_at)
       .run();
 
     return new Response(
@@ -110,21 +127,21 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
     }
 
     const name = data.name;
-    const url = data.url || '';
+    const food_url = data.food_url || '';
     const image_url = data.image_url || '';
     const city = data.city || '';
     const district = data.district || '';
     const category = data.category || '經典小吃';
     const note = data.note || '';
-    const latitude = Number(data.latitude);
-    const longitude = Number(data.longitude);
+    const latitude = data.latitude !== null && data.latitude !== undefined && !isNaN(data.latitude) ? Number(data.latitude) : null;
+    const longitude = data.longitude !== null && data.longitude !== undefined && !isNaN(data.longitude) ? Number(data.longitude) : null;
 
     await env.DB.prepare(
       `UPDATE places 
        SET name = ?, url = ?, image_url = ?, city = ?, district = ?, category = ?, note = ?, latitude = ?, longitude = ?
        WHERE id = ?`
     )
-      .bind(name, url, image_url, city, district, category, note, latitude, longitude, id)
+      .bind(name, food_url, image_url, city, district, category, note, latitude, longitude, id)
       .run();
 
     return new Response(

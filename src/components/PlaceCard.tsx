@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigation, Trash2, MapPin, Copy, Check, Edit3 } from 'lucide-react';
+import { Navigation, Trash2, MapPin, Copy, Check, Edit3, ExternalLink } from 'lucide-react';
 import { Place } from '../types';
 
 interface PlaceCardProps {
@@ -22,10 +22,12 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
   const defaultImg =
     'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
 
+  const hasMap = !!(place.map_url || (place.latitude && place.longitude));
+
   const handleOpenNav = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (place.url) {
-      window.open(place.url, '_blank');
+    if (place.map_url) {
+      window.open(place.map_url, '_blank');
     } else {
       const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         `${place.name} ${place.city} ${place.district}`
@@ -34,12 +36,22 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
     }
   };
 
-  const handleCopyLink = (e: React.MouseEvent) => {
+  const handleOpenFoodUrl = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const linkToCopy = place.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.city} ${place.district}`)}`;
-    navigator.clipboard.writeText(linkToCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (place.food_url) {
+      window.open(place.food_url, '_blank');
+    }
+  };
+
+  // 複製「美食連結」
+  const handleCopyFoodLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const linkToCopy = place.food_url || place.map_url || '';
+    if (linkToCopy) {
+      navigator.clipboard.writeText(linkToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
@@ -52,7 +64,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
       }`}
     >
       <div className="flex flex-col sm:flex-row">
-        {/* 美食照片 */}
+        {/* 美食照片 (由美食連結取得之縮圖) */}
         <div className="relative sm:w-36 h-36 sm:h-auto shrink-0 bg-slate-100 overflow-hidden">
           <img
             src={place.image_url || defaultImg}
@@ -67,6 +79,13 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
           {place.category && (
             <span className="absolute top-2 left-2 bg-black/65 backdrop-blur-md text-white text-[11px] font-semibold px-2 py-0.5 rounded-md">
               {place.category}
+            </span>
+          )}
+
+          {/* 無地圖標記小標籤 */}
+          {!hasMap && (
+            <span className="absolute bottom-2 left-2 bg-slate-800/80 backdrop-blur-md text-slate-200 text-[10px] font-medium px-2 py-0.5 rounded">
+              僅文章清單
             </span>
           )}
         </div>
@@ -96,18 +115,28 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
             )}
           </div>
 
-          {/* 底部功能操作列 (編輯、複製連結、導航、刪除) */}
+          {/* 底部功能操作列 (導航/看食記、編輯、複製美食連結、刪除) */}
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-            {/* 一鍵 Google Maps 導航 */}
-            <button
-              id={`btn-nav-${place.id}`}
-              onClick={handleOpenNav}
-              className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-3 py-1.5 text-xs sm:text-sm"
-              title="開啟 Google 地圖進行即時導航"
-            >
-              <Navigation className="w-4 h-4 fill-white" />
-              <span>導航</span>
-            </button>
+            {hasMap ? (
+              <button
+                id={`btn-nav-${place.id}`}
+                onClick={handleOpenNav}
+                className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-3 py-1.5 text-xs sm:text-sm"
+                title="開啟 Google 地圖進行即時導航"
+              >
+                <Navigation className="w-4 h-4 fill-white" />
+                <span>導航</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleOpenFoodUrl}
+                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-sm hover:shadow active:scale-95 transition-all px-3 py-1.5 text-xs sm:text-sm"
+                title="開啟原始美食文章或社群分享"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>看介紹</span>
+              </button>
+            )}
 
             <div className="flex items-center gap-1.5">
               {/* 編輯店家 */}
@@ -123,15 +152,15 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
                 <span className="hidden sm:inline">編輯</span>
               </button>
 
-              {/* 複製美食連結 */}
+              {/* 複製「美食連結」 */}
               <button
-                onClick={handleCopyLink}
+                onClick={handleCopyFoodLink}
                 className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all border ${
                   copied
                     ? 'bg-green-50 border-green-300 text-green-700 font-bold'
                     : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600'
                 }`}
-                title="複製美食 Google 地圖連結"
+                title="複製美食食記或文章分享連結"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copied ? '已複製' : '複製連結'}</span>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Link2, AlertCircle } from 'lucide-react';
+import { X, Link2, MapPin, AlertCircle, Utensils } from 'lucide-react';
 import { Place } from '../types';
 import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
 
@@ -17,7 +17,8 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
   initialData,
 }) => {
   const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
+  const [foodUrl, setFoodUrl] = useState('');
+  const [mapUrl, setMapUrl] = useState('');
   const [city, setCity] = useState('台北市');
   const [district, setDistrict] = useState('中正區');
   const [category, setCategory] = useState('經典小吃');
@@ -30,14 +31,16 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
   useEffect(() => {
     if (initialData) {
       setName(initialData.name || '');
-      setUrl(initialData.url || '');
+      setFoodUrl(initialData.food_url || (initialData as any).url || '');
+      setMapUrl(initialData.map_url || (initialData.latitude ? (initialData as any).url : '') || '');
       setCity(initialData.city || '台北市');
       setDistrict(initialData.district || '中正區');
       setCategory(initialData.category || '經典小吃');
       setNote(initialData.note || '');
     } else {
       setName('');
-      setUrl('');
+      setFoodUrl('');
+      setMapUrl('');
       setCity('台北市');
       setDistrict('中正區');
       setCategory('經典小吃');
@@ -55,8 +58,10 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     }
   };
 
-  // Auto extract coordinates from Google Maps URL if available
-  const extractCoordsFromUrl = (inputUrl: string) => {
+  // Auto extract coordinates from Google Maps URL if provided
+  const extractCoordsFromMapUrl = (inputUrl: string) => {
+    if (!inputUrl || !inputUrl.trim()) return null;
+
     const coordMatch = inputUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
     if (coordMatch && coordMatch[1] && coordMatch[2]) {
       return { lat: parseFloat(coordMatch[1]), lng: parseFloat(coordMatch[2]) };
@@ -75,9 +80,22 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     return null;
   };
 
-  // Auto generate photo from link / category
-  const generateImageFromUrlOrCategory = (linkUrl: string, cat: string) => {
-    // Category curated image library
+  // Helper: Extract or fetch thumbnail from food_url
+  const getThumbnailFromFoodUrl = (url: string, cat: string) => {
+    if (!url) return '';
+
+    // Direct Image URL detection
+    if (/\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i.test(url)) {
+      return url;
+    }
+
+    // YouTube Video / Shorts Thumbnail
+    const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+    if (ytMatch && ytMatch[1]) {
+      return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+    }
+
+    // Category Curated High-Quality Food Photo
     const categoryImages: { [key: string]: string } = {
       '經典小吃': 'https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=800&auto=format&fit=crop&q=80',
       '傳統麵食': 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&auto=format&fit=crop&q=80',
@@ -100,16 +118,23 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       setError('請輸入店家名稱！');
       return;
     }
+    if (!foodUrl.trim()) {
+      setError('請輸入美食連結（必填）！');
+      return;
+    }
 
-    const urlCoords = extractCoordsFromUrl(url.trim());
-    let finalLat = urlCoords?.lat;
-    let finalLng = urlCoords?.lng;
+    // Google Maps coordinates logic:
+    // If map_url is provided, calculate coordinates. If not provided, lat/lng will be null (won't show on map).
+    let finalLat: number | null = null;
+    let finalLng: number | null = null;
 
-    if (finalLat === undefined || finalLng === undefined) {
-      if (initialData?.latitude && initialData?.longitude) {
-        finalLat = initialData.latitude;
-        finalLng = initialData.longitude;
+    if (mapUrl.trim()) {
+      const urlCoords = extractCoordsFromMapUrl(mapUrl.trim());
+      if (urlCoords) {
+        finalLat = urlCoords.lat;
+        finalLng = urlCoords.lng;
       } else {
+        // Fallback to district center
         const cityData = TAIWAN_LOCATIONS.find((c) => c.city === city);
         const distData = cityData?.districts.find((d) => d.name === district);
         finalLat = distData?.lat || cityData?.lat || 25.0375;
@@ -117,7 +142,8 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       }
     }
 
-    const autoImageUrl = generateImageFromUrlOrCategory(url.trim(), category);
+    // Extract thumbnail from food_url
+    const autoImageUrl = getThumbnailFromFoodUrl(foodUrl.trim(), category);
 
     setSubmitting(true);
     setError(null);
@@ -127,8 +153,9 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
         await onSavePlace({
           ...initialData,
           name: name.trim(),
-          url: url.trim(),
-          image_url: initialData.image_url || autoImageUrl,
+          food_url: foodUrl.trim(),
+          map_url: mapUrl.trim(),
+          image_url: autoImageUrl,
           city,
           district,
           category,
@@ -139,7 +166,8 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       } else {
         await onSavePlace({
           name: name.trim(),
-          url: url.trim(),
+          food_url: foodUrl.trim(),
+          map_url: mapUrl.trim(),
           image_url: autoImageUrl,
           city,
           district,
@@ -171,7 +199,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-2xl">🍲</span>
             <h2 className="font-black tracking-tight text-xl">
-              {isEditing ? '編輯美食地點' : '新增美食地點'}
+              {isEditing ? '編輯美食資訊' : '新增私房美食'}
             </h2>
           </div>
           <button
@@ -206,23 +234,44 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             />
           </div>
 
-          {/* Google 地圖分享連結 */}
+          {/* 美食連結 (必填) */}
           <div>
             <label className="block font-bold text-slate-800 mb-1 text-sm">
-              Google 地圖分享連結
+              美食連結 (食記／IG／短影片／文章介紹) <span className="text-orange-600">* (必填)</span>
             </label>
             <div className="relative">
               <input
                 type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://maps.app.goo.gl/... 或 Google Maps 網址"
+                required
+                value={foodUrl}
+                onChange={(e) => setFoodUrl(e.target.value)}
+                placeholder="https://... 貼上食記分享網址、IG 或部落格連結"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm"
               />
-              <Link2 className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Utensils className="w-5 h-5 text-orange-500 absolute left-3 top-1/2 -translate-y-1/2" />
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              💡 系統會自動根據此 Google 地圖連結進行精準定位與自動縮圖生成。
+              ✨ 系統會自動從此美食連結中抓取縮圖並展示在圖卡上，複製按鈕亦會複製此美食連結。
+            </p>
+          </div>
+
+          {/* Google 地圖連結 (非必填) */}
+          <div>
+            <label className="block font-bold text-slate-800 mb-1 text-sm">
+              Google 地圖連結 <span className="text-slate-400 font-normal">(選填，若無填寫則僅在清單顯示)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="url"
+                value={mapUrl}
+                onChange={(e) => setMapUrl(e.target.value)}
+                placeholder="https://maps.app.goo.gl/... 或 Google Maps 連結"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm"
+              />
+              <MapPin className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              💡 有填寫 Google 地圖連結時會在地圖上標記圖釘並提供導航；未填寫時地圖上不顯示圖釘。
             </p>
           </div>
 
@@ -290,7 +339,7 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="例：一定要點招牌牛肉麵，小菜花干吸飽湯汁超讚！附近好停車。"
+              placeholder="例：一定要點招牌牛肉麵，小菜花干吸飽湯汁超讚！"
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm font-medium"
             />
           </div>

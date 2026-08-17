@@ -62,8 +62,10 @@ export const RandomWheel: React.FC<RandomWheelProps> = ({
 
   const handleNav = () => {
     if (!selectedResult) return;
-    if (selectedResult.url) {
-      window.open(selectedResult.url, '_blank');
+    if (selectedResult.map_url) {
+      window.open(selectedResult.map_url, '_blank');
+    } else if (selectedResult.food_url) {
+      window.open(selectedResult.food_url, '_blank');
     } else {
       const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         `${selectedResult.name} ${selectedResult.city} ${selectedResult.district}`

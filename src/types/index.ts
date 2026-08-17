@@ -1,15 +1,15 @@
 export interface Place {
   id: string;
   name: string;
-  url?: string;
-  image_url?: string;
+  food_url: string;       // 美食分享連結 (必填，食記/IG/部落格/介紹等)
+  map_url?: string;       // Google 地圖連結 (非必填)
+  image_url?: string;     // 由美食連結取得或自動生成的縮圖
   city: string;
   district: string;
   category?: string;
   note?: string;
-  latitude: number;
-  longitude: number;
-  rating?: number;
+  latitude?: number | null;   // 若無 Google 地圖則為 null / undefined
+  longitude?: number | null;  // 若無 Google 地圖則為 null / undefined
   created_at?: string;
 }
 

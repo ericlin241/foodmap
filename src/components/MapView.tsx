@@ -2,9 +2,9 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Place } from '../types';
-import { Navigation, MapPin, X, Copy, Check, Edit3 } from 'lucide-react';
+import { Navigation, MapPin, X, Copy, Check, Edit3, ExternalLink, AlertTriangle } from 'lucide-react';
 
-// Custom Marker Icons (Pinned precisely at center-bottom tip, always crisp and visible)
+// Custom Marker Icons
 const createCustomIcon = (isSelected: boolean) => {
   const width = isSelected ? 48 : 38;
   const height = isSelected ? 60 : 48;
@@ -35,16 +35,16 @@ const createCustomIcon = (isSelected: boolean) => {
 function MapFlyController({
   selectedPlace,
   centerPosition,
-  places,
+  mapPlaces,
 }: {
   selectedPlace: Place | null;
   centerPosition?: { lat: number; lng: number; zoom?: number } | null;
-  places: Place[];
+  mapPlaces: Place[];
 }) {
   const map = useMap();
 
   useEffect(() => {
-    if (selectedPlace) {
+    if (selectedPlace && selectedPlace.latitude !== null && selectedPlace.longitude !== null && selectedPlace.latitude !== undefined && selectedPlace.longitude !== undefined) {
       map.setView([selectedPlace.latitude, selectedPlace.longitude], 16, {
         animate: true,
       });
@@ -53,14 +53,16 @@ function MapFlyController({
         animate: true,
         duration: 0.8,
       });
-    } else if (places.length > 0) {
-      const validPlaces = places.filter((p) => !isNaN(p.latitude) && !isNaN(p.longitude));
+    } else if (mapPlaces.length > 0) {
+      const validPlaces = mapPlaces.filter(
+        (p) => p.latitude !== null && p.longitude !== null && !isNaN(p.latitude as number) && !isNaN(p.longitude as number)
+      );
       if (validPlaces.length > 0) {
-        const bounds = L.latLngBounds(validPlaces.map((p) => [p.latitude, p.longitude]));
+        const bounds = L.latLngBounds(validPlaces.map((p) => [p.latitude as number, p.longitude as number]));
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
       }
     }
-  }, [selectedPlace, centerPosition, places, map]);
+  }, [selectedPlace, centerPosition, mapPlaces, map]);
 
   return null;
 }
@@ -71,6 +73,7 @@ interface MapViewProps {
   onSelectPlace: (place: Place | null) => void;
   onEditPlace?: (place: Place) => void;
   centerPosition?: { lat: number; lng: number; zoom?: number } | null;
+  noMapAlert: string | null;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
@@ -79,6 +82,7 @@ export const MapView: React.FC<MapViewProps> = ({
   onSelectPlace,
   onEditPlace,
   centerPosition,
+  noMapAlert,
 }) => {
   const defaultCenter = { lat: 23.9738, lng: 120.982, zoom: 8 };
   const [copied, setCopied] = React.useState(false);
@@ -86,9 +90,16 @@ export const MapView: React.FC<MapViewProps> = ({
   const defaultImg =
     'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
 
+  // Filter only places with valid map coordinates for Leaflet Markers
+  const mapPlaces = places.filter(
+    (p) => p.latitude !== null && p.longitude !== null && p.latitude !== undefined && p.longitude !== undefined && !isNaN(p.latitude) && !isNaN(p.longitude)
+  );
+
+  const hasMap = !!(selectedPlace && (selectedPlace.map_url || (selectedPlace.latitude && selectedPlace.longitude)));
+
   const handleNav = (place: Place) => {
-    if (place.url) {
-      window.open(place.url, '_blank');
+    if (place.map_url) {
+      window.open(place.map_url, '_blank');
     } else {
       const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         `${place.name} ${place.city} ${place.district}`
@@ -97,12 +108,20 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  // Copy place Google Map link
-  const handleCopyLink = (place: Place) => {
-    const linkToCopy = place.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.city} ${place.district}`)}`;
-    navigator.clipboard.writeText(linkToCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleOpenFoodUrl = (place: Place) => {
+    if (place.food_url) {
+      window.open(place.food_url, '_blank');
+    }
+  };
+
+  // 複製「美食連結」
+  const handleCopyFoodLink = (place: Place) => {
+    const linkToCopy = place.food_url || place.map_url || '';
+    if (linkToCopy) {
+      navigator.clipboard.writeText(linkToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (
@@ -121,17 +140,17 @@ export const MapView: React.FC<MapViewProps> = ({
         <MapFlyController
           selectedPlace={selectedPlace}
           centerPosition={centerPosition}
-          places={places}
+          mapPlaces={mapPlaces}
         />
 
-        {/* Places Markers */}
-        {places.map((place) => {
+        {/* Places Markers (只渲染有提供 Google 地圖連結的店家) */}
+        {mapPlaces.map((place) => {
           const isSelected = selectedPlace?.id === place.id;
 
           return (
             <Marker
               key={place.id}
-              position={[place.latitude, place.longitude]}
+              position={[place.latitude as number, place.longitude as number]}
               icon={createCustomIcon(isSelected)}
               eventHandlers={{
                 click: () => onSelectPlace(place),
@@ -141,10 +160,21 @@ export const MapView: React.FC<MapViewProps> = ({
         })}
       </MapContainer>
 
+      {/* 尚未新增地圖的小警示 (顯示兩秒) */}
+      {noMapAlert && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/90 text-white px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-md border border-slate-700/80 flex items-center gap-2.5 animate-in fade-in slide-in-from-top-3 duration-200">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 animate-bounce" />
+          <div>
+            <p className="font-bold text-sm text-amber-200">{noMapAlert}</p>
+            <p className="text-[11px] text-slate-300">此店家尚未填寫 Google 地圖連結，僅在左側清單顯示</p>
+          </div>
+        </div>
+      )}
+
       {/* 固定右上角的美食資訊圖卡 (最上最右留白間距) */}
       {selectedPlace && (
         <div className="absolute top-4 right-4 z-30 w-80 sm:w-96 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
-          {/* 照片區塊 */}
+          {/* 照片區塊 (使用美食連結的縮圖) */}
           <div className="relative h-40 sm:h-44 w-full bg-slate-100 overflow-hidden">
             <img
               src={selectedPlace.image_url || defaultImg}
@@ -204,27 +234,38 @@ export const MapView: React.FC<MapViewProps> = ({
               </div>
             )}
 
-            {/* 功能按鈕列 (移除 LINE，複製按鈕為複製連結) */}
+            {/* 功能按鈕列 (複製美食連結、導航/看介紹) */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-              <button
-                onClick={() => handleNav(selectedPlace)}
-                className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
-              >
-                <Navigation className="w-4 h-4 fill-white" />
-                <span>Google 地圖導航</span>
-              </button>
+              {hasMap ? (
+                <button
+                  onClick={() => handleNav(selectedPlace)}
+                  className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
+                >
+                  <Navigation className="w-4 h-4 fill-white" />
+                  <span>Google 地圖導航</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleOpenFoodUrl(selectedPlace)}
+                  className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>開啟美食介紹連結</span>
+                </button>
+              )}
 
+              {/* 複製美食連結 */}
               <button
-                onClick={() => handleCopyLink(selectedPlace)}
+                onClick={() => handleCopyFoodLink(selectedPlace)}
                 className={`py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 border transition-all ${
                   copied
                     ? 'bg-green-50 border-green-300 text-green-700'
                     : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
                 }`}
-                title="複製 Google 地圖美食連結"
+                title="複製美食食記或文章連結"
               >
                 {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? '已複製連結' : '複製連結'}</span>
+                <span>{copied ? '已複製' : '複製美食連結'}</span>
               </button>
             </div>
           </div>
