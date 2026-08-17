@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Place } from '../types';
 import { Navigation, MapPin, X, Copy, Check, Edit3, ExternalLink, AlertTriangle } from 'lucide-react';
+import { AutoFoodImage } from './AutoFoodImage';
 
 // Custom Marker Icons (Pinned at center-bottom tip, with pin-wrapper for vertical bounce)
 const createCustomIcon = (isSelected: boolean) => {
@@ -178,18 +179,11 @@ export const MapView: React.FC<MapViewProps> = ({
         <div className="absolute top-4 right-4 z-30 w-80 sm:w-96 bg-white/98 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
           {/* 照片區塊 (使用美食連結的縮圖) */}
           <div className="relative h-40 sm:h-44 w-full bg-slate-100 overflow-hidden">
-            <img
-              src={selectedPlace.image_url || defaultImg}
-              alt={selectedPlace.name}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = defaultImg;
-              }}
-              className="w-full h-full object-cover"
-            />
+            <AutoFoodImage place={selectedPlace} />
             {/* 關閉按鈕 */}
             <button
               onClick={() => onSelectPlace(null)}
-              className="absolute top-2.5 right-2.5 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 backdrop-blur-md shadow transition-all active:scale-95"
+              className="absolute top-2.5 right-2.5 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 backdrop-blur-md shadow transition-all active:scale-95 z-20"
               title="關閉卡片"
             >
               <X className="w-4 h-4" />
@@ -197,7 +191,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
             {/* 類別標籤 */}
             {selectedPlace.category && (
-              <span className="absolute bottom-2.5 left-2.5 bg-orange-600/90 text-white text-xs font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm shadow">
+              <span className="absolute bottom-2.5 left-2.5 bg-orange-600/90 text-white text-xs font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm shadow z-20">
                 {selectedPlace.category}
               </span>
             )}

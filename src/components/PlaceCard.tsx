@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Navigation, Trash2, MapPin, Copy, Check, Edit3, ExternalLink } from 'lucide-react';
 import { Place } from '../types';
+import { AutoFoodImage } from './AutoFoodImage';
 
 interface PlaceCardProps {
   place: Place;
@@ -66,14 +67,9 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
       <div className="flex flex-col sm:flex-row">
         {/* 美食照片 (由美食連結取得之縮圖) */}
         <div className="relative sm:w-36 h-36 sm:h-auto shrink-0 bg-slate-100 overflow-hidden">
-          <img
-            src={place.image_url || defaultImg}
-            alt={place.name}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = defaultImg;
-            }}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
+          <AutoFoodImage
+            place={place}
+            className="group-hover:scale-105 transition-transform duration-300"
           />
           {/* 類別標籤 */}
           {place.category && (
