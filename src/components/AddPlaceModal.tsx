@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, AlertCircle, Utensils, Navigation, Check, Locate, Edit2, Image as ImageIcon } from 'lucide-react';
+import { X, MapPin, AlertCircle, Utensils, Check } from 'lucide-react';
 import { Place } from '../types';
 import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
 import { extractCoordsFromUrl, resolveGoogleMapsShortlink, geocodePlace } from '../utils/geocoding';
@@ -346,74 +346,29 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
             )}
 
             {previewImage && !fetchingImage && (
-              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={previewImage}
-                    alt="美食縮圖預覽"
-                    className="w-14 h-14 object-cover rounded-lg border border-slate-200 shadow-sm"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80';
-                    }}
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
-                      已設定美食代表縮圖
-                    </p>
-                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">將直接顯示於地圖圖卡與美食清單上</p>
-                  </div>
+              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+                <img
+                  src={previewImage}
+                  alt="美食縮圖預覽"
+                  className="w-14 h-14 object-cover rounded-lg border border-slate-200 shadow-sm"
+                  onError={() => setPreviewImage('')}
+                />
+                <div>
+                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
+                    已成功讀取美食網址縮圖
+                  </p>
+                  <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">將直接顯示於地圖圖卡與美食清單上</p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const customImg = prompt('請貼上自訂照片網址 (例如 IG 照片或食記圖片網址)：', previewImage);
-                    if (customImg && customImg.trim()) {
-                      setPreviewImage(customImg.trim());
-                    }
-                  }}
-                  className="px-2.5 py-1 text-xs font-bold text-orange-600 hover:bg-orange-50 rounded-lg border border-orange-200 transition-all shrink-0"
-                >
-                  換一張圖
-                </button>
-              </div>
-            )}
-
-            {!previewImage && !fetchingImage && (
-              <div className="mt-1 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">離線時無法連外讀取 OpenGraph</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const customImg = prompt('請貼上自訂照片網址：');
-                    if (customImg && customImg.trim()) {
-                      setPreviewImage(customImg.trim());
-                    }
-                  }}
-                  className="text-[11px] text-orange-600 hover:underline font-bold"
-                >
-                  ＋ 手動貼上自訂圖片網址
-                </button>
               </div>
             )}
           </div>
 
           {/* Google 地圖連結 (非必填) */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block font-bold text-slate-800 text-sm">
-                Google 地圖連結 <span className="text-slate-400 font-normal">(選填)</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowCoordInput(!showCoordInput)}
-                className="text-xs text-orange-600 hover:text-orange-700 font-bold flex items-center gap-1"
-              >
-                <Edit2 className="w-3 h-3" />
-                {showCoordInput ? '隱藏經緯度' : '手動校準經緯度'}
-              </button>
-            </div>
+            <label className="block font-bold text-slate-800 mb-1 text-sm">
+              Google 地圖連結 <span className="text-slate-400 font-normal">(選填，若無填寫則僅在清單顯示)</span>
+            </label>
             <div className="relative">
               <input
                 type="url"
@@ -437,46 +392,6 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
                 <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
                 {coordSuccessMsg}
               </p>
-            )}
-
-            {/* 手動經緯度微調面板 (支援直接輸入精確座標) */}
-            {showCoordInput && (
-              <div className="mt-2.5 p-3 bg-orange-50/60 rounded-xl border border-orange-200/80 space-y-2 animate-in fade-in duration-150">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-orange-800">
-                  <Locate className="w-3.5 h-3.5" />
-                  <span>經緯度微調（可由 Google 地圖右鍵直接複製）</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-600">緯度 (Latitude)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={customLat}
-                      onChange={(e) => {
-                        setCustomLat(e.target.value);
-                        setCoordSuccessMsg(`手動自訂座標 (${e.target.value}, ${customLng})`);
-                      }}
-                      placeholder="例：25.04891"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-600">經度 (Longitude)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={customLng}
-                      onChange={(e) => {
-                        setCustomLng(e.target.value);
-                        setCoordSuccessMsg(`手動自訂座標 (${customLat}, ${e.target.value})`);
-                      }}
-                      placeholder="例：121.53852"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
             )}
           </div>
 
