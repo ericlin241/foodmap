@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Link2, MapPin, AlertCircle, Utensils } from 'lucide-react';
+import { X, MapPin, AlertCircle, Utensils, Navigation, Check } from 'lucide-react';
 import { Place } from '../types';
 import { TAIWAN_LOCATIONS, FOOD_CATEGORIES } from '../data/taiwanDistricts';
-import { extractCoordsFromUrl, geocodePlace } from '../utils/geocoding';
+import { extractCoordsFromUrl, resolveGoogleMapsShortlink, geocodePlace } from '../utils/geocoding';
 
 interface PlaceModalProps {
   isOpen: boolean;
@@ -27,6 +27,10 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Real-time parsed coordinates state
+  const [parsedCoords, setParsedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [resolvingMap, setResolvingMap] = useState(false);
+
   const isEditing = !!initialData;
 
   useEffect(() => {
@@ -38,6 +42,11 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       setDistrict(initialData.district || '中正區');
       setCategory(initialData.category || '經典小吃');
       setNote(initialData.note || '');
+      if (initialData.latitude && initialData.longitude) {
+        setParsedCoords({ lat: initialData.latitude, lng: initialData.longitude });
+      } else {
+        setParsedCoords(null);
+      }
     } else {
       setName('');
       setFoodUrl('');
@@ -46,9 +55,37 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       setDistrict('中正區');
       setCategory('經典小吃');
       setNote('');
+      setParsedCoords(null);
     }
     setError(null);
   }, [initialData, isOpen]);
+
+  // When Google Map link changes, automatically attempt real-time coordinate parsing & shortlink resolution
+  const handleMapUrlChange = async (newUrl: string) => {
+    setMapUrl(newUrl);
+    if (!newUrl.trim()) {
+      setParsedCoords(null);
+      return;
+    }
+
+    // 1. Direct Regex
+    const directCoords = extractCoordsFromUrl(newUrl.trim());
+    if (directCoords) {
+      setParsedCoords(directCoords);
+      return;
+    }
+
+    // 2. Shortlink resolver
+    if (newUrl.includes('goo.gl') || newUrl.includes('maps.app')) {
+      setResolvingMap(true);
+      const resolved = await resolveGoogleMapsShortlink(newUrl.trim());
+      setResolvingMap(false);
+      if (resolved) {
+        setParsedCoords(resolved);
+        return;
+      }
+    }
+  };
 
   // When city changes, update district default
   const handleCityChange = (cityName: string) => {
@@ -59,24 +96,19 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
     }
   };
 
-
-
-  // Helper: Extract or fetch thumbnail from food_url
+  // Helper: Extract thumbnail from food_url
   const getThumbnailFromFoodUrl = (url: string, cat: string) => {
     if (!url) return '';
 
-    // Direct Image URL detection
     if (/\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i.test(url)) {
       return url;
     }
 
-    // YouTube Video / Shorts Thumbnail
     const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
     if (ytMatch && ytMatch[1]) {
       return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
     }
 
-    // Category Curated High-Quality Food Photo
     const categoryImages: { [key: string]: string } = {
       '經典小吃': 'https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=800&auto=format&fit=crop&q=80',
       '傳統麵食': 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&auto=format&fit=crop&q=80',
@@ -104,39 +136,48 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       return;
     }
 
-    // Google Maps coordinates logic:
-    // 1. First try parsing exact coordinates from mapUrl (@lat,lng or !3d!4d or ?q=)
-    // 2. If not found in mapUrl, query high-precision geocoding via OpenStreetMap for the exact store name and city/district
-    // 3. If geocoding fails, fallback to district center coordinates
+    setSubmitting(true);
+    setError(null);
+
     let finalLat: number | null = null;
     let finalLng: number | null = null;
 
     if (mapUrl.trim()) {
-      const urlCoords = extractCoordsFromUrl(mapUrl.trim());
-      if (urlCoords) {
-        finalLat = urlCoords.lat;
-        finalLng = urlCoords.lng;
+      // 1. If parsedCoords already resolved
+      if (parsedCoords) {
+        finalLat = parsedCoords.lat;
+        finalLng = parsedCoords.lng;
       } else {
-        // High-precision geocoding for store name in this district
-        const geoResult = await geocodePlace(name.trim(), city, district);
-        if (geoResult) {
-          finalLat = geoResult.lat;
-          finalLng = geoResult.lng;
+        // 2. Direct regex
+        const direct = extractCoordsFromUrl(mapUrl.trim());
+        if (direct) {
+          finalLat = direct.lat;
+          finalLng = direct.lng;
         } else {
-          // District center fallback
-          const cityData = TAIWAN_LOCATIONS.find((c) => c.city === city);
-          const distData = cityData?.districts.find((d) => d.name === district);
-          finalLat = distData?.lat || cityData?.lat || 25.0375;
-          finalLng = distData?.lng || cityData?.lng || 121.5637;
+          // 3. Shortlink resolution
+          const resolved = await resolveGoogleMapsShortlink(mapUrl.trim());
+          if (resolved) {
+            finalLat = resolved.lat;
+            finalLng = resolved.lng;
+          } else {
+            // 4. Geocode by store name
+            const geo = await geocodePlace(name.trim(), city, district);
+            if (geo) {
+              finalLat = geo.lat;
+              finalLng = geo.lng;
+            } else {
+              // 5. Fallback to district center
+              const cityData = TAIWAN_LOCATIONS.find((c) => c.city === city);
+              const distData = cityData?.districts.find((d) => d.name === district);
+              finalLat = distData?.lat || cityData?.lat || 25.0375;
+              finalLng = distData?.lng || cityData?.lng || 121.5637;
+            }
+          }
         }
       }
     }
 
-    // Extract thumbnail from food_url
     const autoImageUrl = getThumbnailFromFoodUrl(foodUrl.trim(), category);
-
-    setSubmitting(true);
-    setError(null);
 
     try {
       if (isEditing && initialData) {
@@ -254,15 +295,26 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
               <input
                 type="url"
                 value={mapUrl}
-                onChange={(e) => setMapUrl(e.target.value)}
+                onChange={(e) => handleMapUrlChange(e.target.value)}
                 placeholder="https://maps.app.goo.gl/... 或 Google Maps 連結"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all text-sm"
               />
               <MapPin className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              💡 有填寫 Google 地圖連結時會在地圖上標記圖釘並提供導航；未填寫時地圖上不顯示圖釘。
-            </p>
+
+            {/* 定位狀態即時提示 */}
+            {resolvingMap && (
+              <p className="text-[11px] text-orange-600 font-semibold mt-1 flex items-center gap-1">
+                <span className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                正在自動解析 Google 地圖高精度經緯度座標...
+              </p>
+            )}
+            {parsedCoords && (
+              <p className="text-[11px] text-green-700 font-bold mt-1 flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-green-600 stroke-[3]" />
+                已成功精準定位！座標：({parsedCoords.lat.toFixed(5)}, {parsedCoords.lng.toFixed(5)})
+              </p>
+            )}
           </div>
 
           {/* 縣市 & 行政區連動 */}
