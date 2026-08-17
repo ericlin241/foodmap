@@ -15,64 +15,72 @@ function getApiUrl(path: string) {
 }
 
 /**
- * Extract exact pin/place coordinates from Google Maps URLs.
- * Priority 1: !3d<lat>!4d<lng> (The exact place pin location)
- * Priority 2: query parameters ?q=<lat>,<lng> or &ll=<lat>,<lng>
- * Priority 3: viewport center @<lat>,<lng> (only if no pin is specified)
+ * Universal Coordinate Extractor for any Google Maps URL format:
+ * - Direct place pins: !3d<lat>!4d<lng> or !2d<lng>!3d<lat>
+ * - Search query parameters: ?q=lat,lng or &ll=lat,lng or &destination=lat,lng
+ * - Static map centers: center=lat%2Clng
+ * - Viewport camera center: @lat,lng
  */
 export function extractCoordsFromUrl(url: string): { lat: number; lng: number } | null {
   if (!url || !url.trim()) return null;
-  const decoded = decodeURIComponent(url);
 
-  // 1. Highest Priority: Google Place Pin Exact Coordinates (!3d<lat>!4d<lng>)
-  const dMatch = decoded.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  // 1. Exact Place Pin Coordinates: !3d<lat>!4d<lng> or encoded %213d<lat>%214d<lng>
+  const dMatch = url.match(/(?:%21|!)3d(-?\d+\.\d+)(?:%21|!)4d(-?\d+\.\d+)/i);
   if (dMatch && dMatch[1] && dMatch[2]) {
     const lat = parseFloat(dMatch[1]);
     const lng = parseFloat(dMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      return { lat, lng };
-    }
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
   }
 
-  // 2. Exact Search/Destination Query: ?q=<lat>,<lng> or &ll=<lat>,<lng> or &destination=<lat>,<lng>
-  const queryMatch = decoded.match(/[?&](?:q|ll|destination|loc:)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  // 2. PB parameter reverse pin: !2d<lng>!3d<lat> or encoded %212d<lng>%213d<lat>
+  const pbMatch = url.match(/(?:%21|!)2d(-?\d+\.\d+)(?:%21|!)3d(-?\d+\.\d+)/i);
+  if (pbMatch && pbMatch[1] && pbMatch[2]) {
+    const lng = parseFloat(pbMatch[1]);
+    const lat = parseFloat(pbMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+  }
+
+  // 3. Exact Query parameters: ?q=lat,lng or &ll=lat,lng or &destination=lat,lng or &loc:lat,lng
+  const queryMatch = url.match(/[?&](?:q|ll|destination|loc:)=(-?\d+\.\d+)(?:%2C|,)(-?\d+\.\d+)/i);
   if (queryMatch && queryMatch[1] && queryMatch[2]) {
     const lat = parseFloat(queryMatch[1]);
     const lng = parseFloat(queryMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      return { lat, lng };
-    }
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
   }
 
-  // 3. Direct Search Path: /search/25.0489,121.5385
-  const pathMatch = decoded.match(/\/search\/(-?\d{1,2}\.\d+),(-?\d{2,3}\.\d+)/);
-  if (pathMatch && pathMatch[1] && pathMatch[2]) {
-    const lat = parseFloat(pathMatch[1]);
-    const lng = parseFloat(pathMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      return { lat, lng };
-    }
+  // 4. Staticmap / Preview center: center=lat,lng or center=lat%2Clng
+  const centerMatch = url.match(/center=(-?\d+\.\d+)(?:%2C|,)(-?\d+\.\d+)/i);
+  if (centerMatch && centerMatch[1] && centerMatch[2]) {
+    const lat = parseFloat(centerMatch[1]);
+    const lng = parseFloat(centerMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
   }
 
-  // 4. Viewport Camera Center: @25.0489123,121.5385123 (Fallback when no !3d!4d pin exists)
-  const atMatch = decoded.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  // 5. Direct path search: /search/lat,lng
+  const searchMatch = url.match(/\/search\/(-?\d{1,2}\.\d+)(?:%2C|,)(-?\d{2,3}\.\d+)/i);
+  if (searchMatch && searchMatch[1] && searchMatch[2]) {
+    const lat = parseFloat(searchMatch[1]);
+    const lng = parseFloat(searchMatch[2]);
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+  }
+
+  // 6. Camera Viewport Center: @lat,lng
+  const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/i);
   if (atMatch && atMatch[1] && atMatch[2]) {
     const lat = parseFloat(atMatch[1]);
     const lng = parseFloat(atMatch[2]);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      return { lat, lng };
-    }
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
   }
 
   return null;
 }
 
-// 2. Resolve Google Shortlink via Backend API /api/resolve-maps
-export async function resolveGoogleMapsShortlink(shortUrl: string): Promise<{ lat: number; lng: number } | null> {
-  if (!shortUrl || !shortUrl.trim()) return null;
+// 2. High-precision Cloudflare Serverless Resolver for Shortlinks & /data= place URLs
+export async function resolveGoogleMapsShortlink(targetUrl: string): Promise<{ lat: number; lng: number } | null> {
+  if (!targetUrl || !targetUrl.trim()) return null;
 
   try {
-    const res = await fetch(getApiUrl(`/api/resolve-maps?url=${encodeURIComponent(shortUrl.trim())}`));
+    const res = await fetch(getApiUrl(`/api/resolve-maps?url=${encodeURIComponent(targetUrl.trim())}`));
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.latitude && data.longitude) {

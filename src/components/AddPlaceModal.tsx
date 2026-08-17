@@ -97,16 +97,14 @@ export const AddPlaceModal: React.FC<PlaceModalProps> = ({
       return;
     }
 
-    // 2. Shortlink resolver backend
-    if (urlStr.includes('goo.gl') || urlStr.includes('maps.app')) {
-      const resolved = await resolveGoogleMapsShortlink(urlStr.trim());
-      if (resolved) {
-        setCustomLat(String(resolved.lat));
-        setCustomLng(String(resolved.lng));
-        setCoordSuccessMsg(`短網址解析成功 (${resolved.lat.toFixed(5)}, ${resolved.lng.toFixed(5)})`);
-        setResolvingMap(false);
-        return;
-      }
+    // 2. Server-side deep resolver backend (Follows redirects, parses HTML /preview/place pb & staticmap pins)
+    const resolved = await resolveGoogleMapsShortlink(urlStr.trim());
+    if (resolved) {
+      setCustomLat(String(resolved.lat));
+      setCustomLng(String(resolved.lng));
+      setCoordSuccessMsg(`地標精準定位 (${resolved.lat.toFixed(5)}, ${resolved.lng.toFixed(5)})`);
+      setResolvingMap(false);
+      return;
     }
 
     // 3. High-precision Geocoding
