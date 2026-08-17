@@ -5,4 +5,4 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "foodmap-db"
-database_id = "your-d1-database-id-here"
+database_id = "cd60dc98-8075-4cc2-aa6f-da61bd801054"
