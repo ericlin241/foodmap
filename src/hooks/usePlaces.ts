@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Place } from '../types';
-import { INITIAL_PLACES } from '../data/initialPlaces';
 
 const STORAGE_KEY = 'foodmap_places_v2_clean';
+
+// Global Cloudflare D1 Serverless API Base URL
+// Ensures all devices (GitHub Pages, custom domains, mobile) sync to the exact same Cloudflare D1 database in real-time
+const CLOUDFLARE_API_HOST = 'https://foodmap-czr.pages.dev';
 
 export function usePlaces() {
   const [places, setPlaces] = useState<Place[]>([]);
@@ -10,23 +13,41 @@ export function usePlaces() {
   const [error, setError] = useState<string | null>(null);
   const [isD1Connected, setIsD1Connected] = useState(false);
 
-  // Fetch places
+  // Helper to determine API URL based on environment
+  const getApiUrl = (path: string) => {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return path; // Use local Vite proxy
+    }
+    if (window.location.hostname.includes('pages.dev')) {
+      return path; // Same-origin Cloudflare Pages
+    }
+    // GitHub Pages or external device -> point directly to Cloudflare D1 API host
+    return `${CLOUDFLARE_API_HOST}${path}`;
+  };
+
+  // Fetch places in real-time from Cloudflare D1
   const fetchPlaces = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/places');
+      const response = await fetch(getApiUrl('/api/places'), {
+        headers: { 'Cache-Control': 'no-cache' },
+      });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
           setPlaces(data);
           setIsD1Connected(true);
           setLoading(false);
+          // Sync to local backup
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          } catch {}
           return;
         }
       }
     } catch {
-      // Backend not running
+      // D1 API call failed
     }
 
     // Fallback: LocalStorage
@@ -36,11 +57,9 @@ export function usePlaces() {
         setPlaces(JSON.parse(cached));
       } else {
         setPlaces([]);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
       }
       setIsD1Connected(false);
     } catch (e) {
-      console.error('LocalStorage failed', e);
       setPlaces([]);
     } finally {
       setLoading(false);
@@ -51,18 +70,17 @@ export function usePlaces() {
     fetchPlaces();
   }, [fetchPlaces]);
 
-  // Add Place
+  // Add Place (Synchronously writes to Cloudflare D1)
   const addPlace = async (newPlaceData: Omit<Place, 'id' | 'created_at'>) => {
     const newPlace: Place = {
       ...newPlaceData,
       id: 'place-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      created_at: new Date().toLocaleString('zh-TW', { hour12: false }),
+      created_at: new Date().toISOString(),
     };
 
-    // Try API
     let savedToD1 = false;
     try {
-      const res = await fetch('/api/places', {
+      const res = await fetch(getApiUrl('/api/places'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newPlace),
@@ -75,10 +93,12 @@ export function usePlaces() {
       savedToD1 = false;
     }
 
-    // Update local state and localStorage
+    // Update local state and backup
     setPlaces((prev) => {
       const updated = [newPlace, ...prev];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
       return updated;
     });
 
@@ -89,7 +109,7 @@ export function usePlaces() {
   const updatePlace = async (updatedPlace: Place) => {
     let savedToD1 = false;
     try {
-      const res = await fetch('/api/places', {
+      const res = await fetch(getApiUrl('/api/places'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedPlace),
@@ -104,7 +124,9 @@ export function usePlaces() {
 
     setPlaces((prev) => {
       const updated = prev.map((p) => (p.id === updatedPlace.id ? updatedPlace : p));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
       return updated;
     });
 
@@ -114,7 +136,7 @@ export function usePlaces() {
   // Delete Place
   const deletePlace = async (id: string) => {
     try {
-      await fetch(`/api/places?id=${encodeURIComponent(id)}`, {
+      await fetch(getApiUrl(`/api/places?id=${encodeURIComponent(id)}`), {
         method: 'DELETE',
       });
     } catch {
@@ -123,15 +145,11 @@ export function usePlaces() {
 
     setPlaces((prev) => {
       const updated = prev.filter((p) => p.id !== id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
       return updated;
     });
-  };
-
-  // Reset to initial demo data
-  const resetToSampleData = () => {
-    setPlaces(INITIAL_PLACES);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_PLACES));
   };
 
   return {
@@ -143,6 +161,5 @@ export function usePlaces() {
     addPlace,
     updatePlace,
     deletePlace,
-    resetToSampleData,
   };
 }

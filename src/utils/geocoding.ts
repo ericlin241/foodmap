@@ -1,5 +1,19 @@
 // Comprehensive Geocoding and Coordinate Resolver
 
+const CLOUDFLARE_API_HOST = 'https://foodmap-czr.pages.dev';
+
+function getApiUrl(path: string) {
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return path;
+    }
+    if (window.location.hostname.includes('pages.dev')) {
+      return path;
+    }
+  }
+  return `${CLOUDFLARE_API_HOST}${path}`;
+}
+
 // 1. Direct Regex Parsing from full Google Maps URL
 export function extractCoordsFromUrl(url: string): { lat: number; lng: number } | null {
   if (!url || !url.trim()) return null;
@@ -37,7 +51,7 @@ export async function resolveGoogleMapsShortlink(shortUrl: string): Promise<{ la
   if (!shortUrl || !shortUrl.trim()) return null;
 
   try {
-    const res = await fetch(`/api/resolve-maps?url=${encodeURIComponent(shortUrl.trim())}`);
+    const res = await fetch(getApiUrl(`/api/resolve-maps?url=${encodeURIComponent(shortUrl.trim())}`));
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.latitude && data.longitude) {
@@ -45,7 +59,7 @@ export async function resolveGoogleMapsShortlink(shortUrl: string): Promise<{ la
       }
     }
   } catch {
-    // Backend resolver offline or pure client dev
+    // Backend resolver offline
   }
   return null;
 }
@@ -60,19 +74,26 @@ export async function geocodePlace(name: string, city: string, district: string)
     ];
 
     for (const q of queries) {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=tw&limit=1`,
-        { headers: { 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8' } }
-      );
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=tw&limit=1`;
+      const res = await fetch(url, {
+        headers: {
+          'Accept-Language': 'zh-TW,zh;q=0.9',
+        },
+      });
+
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
-          return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        if (data && data.length > 0) {
+          return {
+            lat: parseFloat(data[0].lat),
+            lng: parseFloat(data[0].lon),
+          };
         }
       }
     }
-  } catch (e) {
-    console.warn('Nominatim geocoding failed', e);
+  } catch (err) {
+    console.warn('Geocoding query error:', err);
   }
+
   return null;
 }
