@@ -50,7 +50,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     const image_url = data.image_url || '';
     const city = data.city || '';
     const district = data.district || '';
-    const category = data.category || '特色小吃';
+    const category = data.category || '經典小吃';
     const note = data.note || '';
     const latitude = Number(data.latitude);
     const longitude = Number(data.longitude);
@@ -75,6 +75,61 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       JSON.stringify({ success: true, id, message: 'Place added successfully' }),
       {
         status: 201,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      }
+    );
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};
+
+// PUT: 編輯更新美食地點
+export const onRequestPut: PagesFunction<Env> = async (context) => {
+  try {
+    const { request, env } = context;
+    if (!env.DB) {
+      return new Response(JSON.stringify({ error: 'D1 Database not bound' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const data: any = await request.json();
+    const id = data.id;
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'Place ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const name = data.name;
+    const url = data.url || '';
+    const image_url = data.image_url || '';
+    const city = data.city || '';
+    const district = data.district || '';
+    const category = data.category || '經典小吃';
+    const note = data.note || '';
+    const latitude = Number(data.latitude);
+    const longitude = Number(data.longitude);
+
+    await env.DB.prepare(
+      `UPDATE places 
+       SET name = ?, url = ?, image_url = ?, city = ?, district = ?, category = ?, note = ?, latitude = ?, longitude = ?
+       WHERE id = ?`
+    )
+      .bind(name, url, image_url, city, district, category, note, latitude, longitude, id)
+      .run();
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Place updated successfully' }),
+      {
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',

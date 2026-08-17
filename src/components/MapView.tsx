@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Place } from '../types';
-import { Navigation, MapPin, X, MessageCircle, Copy, Check } from 'lucide-react';
+import { Navigation, MapPin, X, Copy, Check, Edit3 } from 'lucide-react';
 
 // Custom Marker Icons (Pinned precisely at center-bottom tip, always crisp and visible)
 const createCustomIcon = (isSelected: boolean) => {
@@ -27,7 +27,7 @@ const createCustomIcon = (isSelected: boolean) => {
     html: svgHtml,
     className: `custom-food-marker ${isSelected ? 'custom-marker-active' : ''}`,
     iconSize: [width, height],
-    iconAnchor: [width / 2, height], // 正下方尖端精準置中對齊
+    iconAnchor: [width / 2, height],
   });
 };
 
@@ -45,7 +45,6 @@ function MapFlyController({
 
   useEffect(() => {
     if (selectedPlace) {
-      // 點選店家時：將地圖視角正正對準經緯度，讓圖釘完全處於畫面正中間
       map.setView([selectedPlace.latitude, selectedPlace.longitude], 16, {
         animate: true,
       });
@@ -70,6 +69,7 @@ interface MapViewProps {
   places: Place[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
+  onEditPlace?: (place: Place) => void;
   centerPosition?: { lat: number; lng: number; zoom?: number } | null;
 }
 
@@ -77,6 +77,7 @@ export const MapView: React.FC<MapViewProps> = ({
   places,
   selectedPlace,
   onSelectPlace,
+  onEditPlace,
   centerPosition,
 }) => {
   const defaultCenter = { lat: 23.9738, lng: 120.982, zoom: 8 };
@@ -96,15 +97,10 @@ export const MapView: React.FC<MapViewProps> = ({
     }
   };
 
-  const handleShareLine = (place: Place) => {
-    const text = `🍲 私房推薦美食【${place.name}】\n📍 位置：${place.city}${place.district}\n📝 推薦：${place.note || '超好吃必點！'}\n🔗 地圖：${place.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`}`;
-    const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
-    window.open(lineUrl, '_blank');
-  };
-
-  const handleCopy = (place: Place) => {
-    const text = `【${place.name}】(${place.city}${place.district})\n推薦備註：${place.note || '無'}\n連結：${place.url || ''}`;
-    navigator.clipboard.writeText(text);
+  // Copy place Google Map link
+  const handleCopyLink = (place: Place) => {
+    const linkToCopy = place.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.city} ${place.district}`)}`;
+    navigator.clipboard.writeText(linkToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -177,14 +173,28 @@ export const MapView: React.FC<MapViewProps> = ({
 
           {/* 內容區塊 */}
           <div className="p-4 space-y-3">
-            <div>
-              <h3 className="font-black text-slate-900 text-lg sm:text-xl leading-tight">
-                {selectedPlace.name}
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1.5 mt-1 font-medium">
-                <MapPin className="w-4 h-4 text-orange-500 shrink-0" />
-                {selectedPlace.city} • {selectedPlace.district}
-              </p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="font-black text-slate-900 text-lg sm:text-xl leading-tight">
+                  {selectedPlace.name}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1.5 mt-1 font-medium">
+                  <MapPin className="w-4 h-4 text-orange-500 shrink-0" />
+                  {selectedPlace.city} • {selectedPlace.district}
+                </p>
+              </div>
+
+              {/* 圖卡編輯按鈕 */}
+              {onEditPlace && (
+                <button
+                  onClick={() => onEditPlace(selectedPlace)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-600 rounded-xl text-xs font-bold transition-all border border-slate-200"
+                  title="編輯店家資訊"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>編輯</span>
+                </button>
+              )}
             </div>
 
             {/* 私房備註 */}
@@ -194,7 +204,7 @@ export const MapView: React.FC<MapViewProps> = ({
               </div>
             )}
 
-            {/* 功能按鈕列 */}
+            {/* 功能按鈕列 (移除 LINE，複製按鈕為複製連結) */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
               <button
                 onClick={() => handleNav(selectedPlace)}
@@ -205,20 +215,16 @@ export const MapView: React.FC<MapViewProps> = ({
               </button>
 
               <button
-                onClick={() => handleShareLine(selectedPlace)}
-                className="p-2.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
-                title="分享到 LINE"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">LINE</span>
-              </button>
-
-              <button
-                onClick={() => handleCopy(selectedPlace)}
-                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium flex items-center gap-1 transition-all"
-                title="複製店家資訊"
+                onClick={() => handleCopyLink(selectedPlace)}
+                className={`py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 border transition-all ${
+                  copied
+                    ? 'bg-green-50 border-green-300 text-green-700'
+                    : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                }`}
+                title="複製 Google 地圖美食連結"
               >
                 {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? '已複製連結' : '複製連結'}</span>
               </button>
             </div>
           </div>

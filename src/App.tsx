@@ -12,7 +12,15 @@ import { TAIWAN_LOCATIONS } from './data/taiwanDistricts';
 import { Map, List, Plus, Database, AlertCircle, RefreshCw } from 'lucide-react';
 
 export function App() {
-  const { places, loading, isD1Connected, addPlace, deletePlace, resetToSampleData } = usePlaces();
+  const {
+    places,
+    loading,
+    isD1Connected,
+    addPlace,
+    updatePlace,
+    deletePlace,
+    resetToSampleData,
+  } = usePlaces();
 
   // Filters
   const [selectedCity, setSelectedCity] = useState('');
@@ -25,7 +33,8 @@ export function App() {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
 
   // Modals
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPlace, setEditingPlace] = useState<Place | null>(null);
   const [isWheelModalOpen, setIsWheelModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
 
@@ -89,13 +98,32 @@ export function App() {
     }
   };
 
+  const handleOpenAddModal = () => {
+    setEditingPlace(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (place: Place) => {
+    setEditingPlace(place);
+    setIsModalOpen(true);
+  };
+
+  const handleSavePlace = async (placeData: any) => {
+    if (editingPlace) {
+      await updatePlace(placeData as Place);
+      if (selectedPlace?.id === editingPlace.id) {
+        setSelectedPlace(placeData as Place);
+      }
+    } else {
+      await addPlace(placeData);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-100 font-sans">
       {/* 頂部導航列 */}
       <Header
-        onOpenAddModal={() => {
-          setIsAddModalOpen(true);
-        }}
+        onOpenAddModal={handleOpenAddModal}
         onOpenWheelModal={() => setIsWheelModalOpen(true)}
         onOpenStatsModal={() => setIsStatsModalOpen(true)}
         totalPlaces={places.length}
@@ -173,6 +201,7 @@ export function App() {
                   place={place}
                   isSelected={selectedPlace?.id === place.id}
                   onSelect={handleSelectPlace}
+                  onEdit={handleOpenEditModal}
                   onDelete={deletePlace}
                 />
               ))
@@ -190,6 +219,7 @@ export function App() {
             places={filteredPlaces}
             selectedPlace={selectedPlace}
             onSelectPlace={handleSelectPlace}
+            onEditPlace={handleOpenEditModal}
             centerPosition={mapCenterPosition}
           />
         </main>
@@ -212,9 +242,7 @@ export function App() {
         {/* 手機版中間大圓新增按鈕 (FAB) */}
         <button
           id="btn-mobile-fab-add"
-          onClick={() => {
-            setIsAddModalOpen(true);
-          }}
+          onClick={handleOpenAddModal}
           className="bg-gradient-to-r from-orange-600 to-amber-500 text-white p-3.5 -mt-6 rounded-full shadow-xl border-4 border-white active:scale-95 transition-all flex items-center justify-center"
           title="新增美食"
         >
@@ -234,11 +262,15 @@ export function App() {
         </button>
       </div>
 
-      {/* 新增美食地點彈窗 */}
+      {/* 新增／編輯美食地點彈窗 */}
       <AddPlaceModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAddPlace={addPlace}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingPlace(null);
+        }}
+        onSavePlace={handleSavePlace}
+        initialData={editingPlace}
       />
 
       {/* 隨機美食轉盤抽籤彈窗 (限定當前選取縣市/行政區) */}

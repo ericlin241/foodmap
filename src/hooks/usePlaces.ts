@@ -10,7 +10,7 @@ export function usePlaces() {
   const [error, setError] = useState<string | null>(null);
   const [isD1Connected, setIsD1Connected] = useState(false);
 
-  // Fetch places (Try Cloudflare D1 /api/places first, fallback to localStorage/initialData)
+  // Fetch places
   const fetchPlaces = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -26,7 +26,7 @@ export function usePlaces() {
         }
       }
     } catch {
-      // Backend not running (pure client dev or offline)
+      // Backend not running
     }
 
     // Fallback: LocalStorage
@@ -85,6 +85,32 @@ export function usePlaces() {
     return { success: true, savedToD1 };
   };
 
+  // Update Place (Edit)
+  const updatePlace = async (updatedPlace: Place) => {
+    let savedToD1 = false;
+    try {
+      const res = await fetch('/api/places', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedPlace),
+      });
+      if (res.ok) {
+        savedToD1 = true;
+        setIsD1Connected(true);
+      }
+    } catch {
+      savedToD1 = false;
+    }
+
+    setPlaces((prev) => {
+      const updated = prev.map((p) => (p.id === updatedPlace.id ? updatedPlace : p));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+
+    return { success: true, savedToD1 };
+  };
+
   // Delete Place
   const deletePlace = async (id: string) => {
     try {
@@ -115,6 +141,7 @@ export function usePlaces() {
     isD1Connected,
     fetchPlaces,
     addPlace,
+    updatePlace,
     deletePlace,
     resetToSampleData,
   };

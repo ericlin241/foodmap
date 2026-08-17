@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Navigation, Trash2, MapPin, MessageCircle, Copy, Check } from 'lucide-react';
+import { Navigation, Trash2, MapPin, Copy, Check, Edit3 } from 'lucide-react';
 import { Place } from '../types';
 
 interface PlaceCardProps {
   place: Place;
   isSelected?: boolean;
   onSelect: (place: Place) => void;
+  onEdit: (place: Place) => void;
   onDelete: (id: string) => void;
 }
 
@@ -13,6 +14,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
   place,
   isSelected,
   onSelect,
+  onEdit,
   onDelete,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -32,17 +34,10 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
     }
   };
 
-  const handleShareLine = (e: React.MouseEvent) => {
+  const handleCopyLink = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `🍲 私房推薦美食【${place.name}】\n📍 位置：${place.city}${place.district}\n📝 推薦：${place.note || '超好吃必點！'}\n🔗 地圖：${place.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}`}`;
-    const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
-    window.open(lineUrl, '_blank');
-  };
-
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const text = `【${place.name}】(${place.city}${place.district})\n推薦備註：${place.note || '無'}\n連結：${place.url || ''}`;
-    navigator.clipboard.writeText(text);
+    const linkToCopy = place.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.city} ${place.district}`)}`;
+    navigator.clipboard.writeText(linkToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -101,7 +96,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
             )}
           </div>
 
-          {/* 底部功能操作列 */}
+          {/* 底部功能操作列 (編輯、複製連結、導航、刪除) */}
           <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
             {/* 一鍵 Google Maps 導航 */}
             <button
@@ -111,28 +106,35 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({
               title="開啟 Google 地圖進行即時導航"
             >
               <Navigation className="w-4 h-4 fill-white" />
-              <span>導航前往</span>
+              <span>導航</span>
             </button>
 
             <div className="flex items-center gap-1.5">
-              {/* 分享到 LINE */}
+              {/* 編輯店家 */}
               <button
-                onClick={handleShareLine}
-                className="p-1.5 sm:px-2 sm:py-1.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
-                title="分享這家店到 LINE 給家人好友"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(place);
+                }}
+                className="p-1.5 sm:px-2 sm:py-1.5 bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all border border-slate-200/80"
+                title="編輯店家資訊"
               >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">LINE</span>
+                <Edit3 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">編輯</span>
               </button>
 
-              {/* 複製文字 */}
+              {/* 複製美食連結 */}
               <button
-                onClick={handleCopy}
-                className="p-1.5 sm:px-2 sm:py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
-                title="複製店家資訊"
+                onClick={handleCopyLink}
+                className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all border ${
+                  copied
+                    ? 'bg-green-50 border-green-300 text-green-700 font-bold'
+                    : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600'
+                }`}
+                title="複製美食 Google 地圖連結"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{copied ? '已複製' : '複製'}</span>
+                <span>{copied ? '已複製' : '複製連結'}</span>
               </button>
 
               {/* 刪除 */}
