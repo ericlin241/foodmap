@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, X, Navigation, Utensils, RefreshCw, Trophy, MapPin } from 'lucide-react';
+import { Sparkles, X, ExternalLink, RefreshCw, Trophy, MapPin } from 'lucide-react';
 import { Place } from '../types';
 
 interface RandomWheelProps {
@@ -21,7 +21,7 @@ export const RandomWheel: React.FC<RandomWheelProps> = ({
 }) => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedResult, setSelectedResult] = useState<Place | null>(null);
-  const [displayCandidate, setDisplayCandidate] = useState<string>('點擊按鈕開始抽籤！');
+  const [displayCandidate, setDisplayCandidate] = useState<string>('');
 
   if (!isOpen) return null;
 
@@ -60,17 +60,12 @@ export const RandomWheel: React.FC<RandomWheelProps> = ({
     }
   };
 
-  const handleNav = () => {
+  const handleOpenFoodUrl = () => {
     if (!selectedResult) return;
-    if (selectedResult.map_url) {
-      window.open(selectedResult.map_url, '_blank');
-    } else if (selectedResult.food_url) {
+    if (selectedResult.food_url) {
       window.open(selectedResult.food_url, '_blank');
-    } else {
-      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        `${selectedResult.name} ${selectedResult.city} ${selectedResult.district}`
-      )}`;
-      window.open(googleMapsUrl, '_blank');
+    } else if (selectedResult.map_url) {
+      window.open(selectedResult.map_url, '_blank');
     }
   };
 
@@ -80,9 +75,9 @@ export const RandomWheel: React.FC<RandomWheelProps> = ({
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-yellow-200 animate-spin" />
+            <Sparkles className="w-6 h-6 text-yellow-200" />
             <h3 className="font-black tracking-tight text-xl">
-              🎲 今天吃什麼？
+              隨機抽籤推薦
             </h3>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-white/20 text-white">
@@ -102,7 +97,7 @@ export const RandomWheel: React.FC<RandomWheelProps> = ({
           {places.length === 0 ? (
             <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-slate-500 space-y-2">
               <p className="font-bold text-slate-700">目前所選區域內尚無收藏美食</p>
-              <p className="text-xs">請先切換至有收藏店家的縣市或行政區後再抽籤！</p>
+              <p className="text-xs">請先新增收藏店家後再抽籤！</p>
             </div>
           ) : (
             <>
@@ -112,7 +107,7 @@ export const RandomWheel: React.FC<RandomWheelProps> = ({
                   selectedResult
                     ? 'bg-gradient-to-b from-amber-50 to-orange-50 border-orange-400 shadow-inner'
                     : isSpinning
-                    ? 'bg-orange-50/50 border-orange-300 animate-pulse'
+                    ? 'bg-orange-50/60 border-orange-300'
                     : 'bg-slate-50 border-slate-200'
                 }`}
               >
@@ -133,12 +128,17 @@ export const RandomWheel: React.FC<RandomWheelProps> = ({
                       </p>
                     )}
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Utensils className={`w-8 h-8 mx-auto ${isSpinning ? 'text-orange-500 animate-bounce' : 'text-slate-400'}`} />
-                    <div className={`font-black ${isSpinning ? 'text-2xl text-orange-600' : 'text-lg text-slate-600'}`}>
+                ) : isSpinning ? (
+                  <div className="space-y-3 py-2">
+                    <span className="inline-block w-3 h-3 rounded-full bg-orange-500 animate-ping" />
+                    <div className="text-2xl font-black text-orange-600 tracking-wide">
                       {displayCandidate}
                     </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1 py-3 text-slate-500">
+                    <p className="font-black text-slate-700 text-base">點擊下方按鈕開始抽籤</p>
+                    <p className="text-xs text-slate-400">從目前範圍內的收藏美食中為您隨機抽選</p>
                   </div>
                 )}
               </div>
@@ -162,12 +162,13 @@ export const RandomWheel: React.FC<RandomWheelProps> = ({
                     >
                       在地圖上查看
                     </button>
+                    {/* 黃色看介紹按鈕 */}
                     <button
-                      onClick={handleNav}
-                      className="py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                      onClick={handleOpenFoodUrl}
+                      className="py-2.5 bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold rounded-xl text-sm flex items-center justify-center gap-1.5 shadow-sm transition-all"
                     >
-                      <Navigation className="w-4 h-4 fill-white" />
-                      開啟 Google 導航
+                      <ExternalLink className="w-4 h-4 text-amber-950" />
+                      看介紹
                     </button>
                   </div>
                 )}
