@@ -154,6 +154,7 @@ function localApiPlugin(): Plugin {
 }
 
 export default defineConfig({
+  base: '/foodmap/',
   plugins: [react(), localApiPlugin()],
   server: {
     port: 3000,
