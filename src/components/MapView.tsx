@@ -4,7 +4,7 @@ import L from 'leaflet';
 import { Place } from '../types';
 import { Navigation, MapPin, X, MessageCircle, Copy, Check } from 'lucide-react';
 
-// Custom Marker Icons (Pinned precisely at center-bottom tip)
+// Custom Marker Icons (Pinned precisely at center-bottom tip, always crisp and visible)
 const createCustomIcon = (isSelected: boolean) => {
   const width = isSelected ? 48 : 38;
   const height = isSelected ? 60 : 48;
@@ -12,8 +12,8 @@ const createCustomIcon = (isSelected: boolean) => {
   const strokeColor = '#ffffff';
 
   const svgHtml = `
-    <div style="width: ${width}px; height: ${height}px; position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 5px 12px rgba(0,0,0,0.45));">
-      <svg width="${width}" height="${height}" viewBox="0 0 38 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="position: absolute; top: 0; left: 0;">
+    <div style="width: ${width}px; height: ${height}px; position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));">
+      <svg width="${width}" height="${height}" viewBox="0 0 38 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="position: absolute; top: 0; left: 0; display: block;">
         <path d="M19 0C8.50659 0 0 8.50659 0 19C0 31.5 19 48 19 48C19 48 38 31.5 38 19C38 8.50659 29.4934 0 19 0Z" fill="${pinBg}" stroke="${strokeColor}" stroke-width="2.5"/>
         <circle cx="19" cy="18" r="13.5" fill="#ffffff"/>
       </svg>
@@ -25,9 +25,9 @@ const createCustomIcon = (isSelected: boolean) => {
 
   return L.divIcon({
     html: svgHtml,
-    className: isSelected ? 'custom-marker-active' : '',
+    className: `custom-food-marker ${isSelected ? 'custom-marker-active' : ''}`,
     iconSize: [width, height],
-    iconAnchor: [width / 2, height], // 正下方尖端對齊經緯度，保證正中間不偏移
+    iconAnchor: [width / 2, height], // 正下方尖端精準置中對齊
   });
 };
 
