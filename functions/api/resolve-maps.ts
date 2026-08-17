@@ -49,8 +49,8 @@ export const onRequestGet: PagesFunction = async (context) => {
       const pbMatch = content.match(/(?:%21|!)2d(-?\d+\.\d+)(?:%21|!)3d(-?\d+\.\d+)/i);
       if (pbMatch) return { lat: parseFloat(pbMatch[2]), lng: parseFloat(pbMatch[1]), source: 'pin_2d3d' };
 
-      // 3. Query params: ?q=lat,lng / &ll=lat,lng / &destination=lat,lng / &loc:lat,lng
-      const queryMatch = content.match(/[?&](?:q|ll|destination|loc:)=(-?\d+\.\d+)(?:%2C|,)(-?\d+\.\d+)/i);
+      // 3. Query params: ?q=lat,lng / &ll=lat,lng / &destination=lat,lng / &loc:lat,lng / &daddr=lat,lng
+      const queryMatch = content.match(/[?&](?:q|ll|destination|loc:|daddr)=(-?\d+\.\d+)(?:%2C|,)(-?\d+\.\d+)/i);
       if (queryMatch) return { lat: parseFloat(queryMatch[1]), lng: parseFloat(queryMatch[2]), source: 'query_param' };
 
       // 4. Staticmap / Preview center: center=lat,lng or center=lat%2Clng
@@ -84,12 +84,15 @@ export const onRequestGet: PagesFunction = async (context) => {
       );
     }
 
+    // Safely encode URI for Cloudflare Workers fetch
+    const encodedTargetUrl = encodeURI(decodeURI(targetUrl));
+
     // Follow redirects to get final expanded Google Maps URL
-    const response = await fetch(targetUrl, {
+    const response = await fetch(encodedTargetUrl, {
       method: 'GET',
       redirect: 'follow',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
       },
@@ -121,31 +124,38 @@ export const onRequestGet: PagesFunction = async (context) => {
         } else if (rawQuery.startsWith('http')) {
           pUrl = rawQuery;
         } else {
-          pUrl = 'https://www.google.com/maps/preview/place?' + rawQuery;
+          pUrl = 'https://www.google.com/maps/preview/place?authuser=0&hl=zh-TW&gl=tw&' + rawQuery.replace(/^\?/, '');
         }
 
         try {
-          const pRes = await fetch(pUrl, {
+          const pRes = await fetch(encodeURI(decodeURI(pUrl)), {
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
               'Accept-Language': 'zh-TW,zh;q=0.9',
             },
           });
           if (pRes.ok) {
             const pText = await pRes.text();
-            const pCoordMatch = pText.match(/\[null,null,(-?\d{1,2}\.\d{4,10}),(-?\d{2,3}\.\d{4,10})\]/) ||
-                                pText.match(/\[\d+(?:\.\d+)?,(-?\d{2,3}\.\d{4,10}),(-?\d{1,2}\.\d{4,10})\]/);
-            if (pCoordMatch) {
-              let pLat = parseFloat(pCoordMatch[1]);
-              let pLng = parseFloat(pCoordMatch[2]);
-              if (pLat > 100 && pLng < 50) {
-                const temp = pLat;
-                pLat = pLng;
-                pLng = temp;
-              }
-              lat = pLat;
-              lng = pLng;
+            const twPair = pText.match(/(2[1-6]\.\d{4,10})[,\s]+(1[1-2][9012]\.\d{4,10})/);
+            if (twPair) {
+              lat = parseFloat(twPair[1]);
+              lng = parseFloat(twPair[2]);
               matchSource = 'preview_place_api';
+            } else {
+              const pCoordMatch = pText.match(/\[null,null,(-?\d{1,2}\.\d{4,10}),(-?\d{2,3}\.\d{4,10})\]/) ||
+                                  pText.match(/\[\d+(?:\.\d+)?,(-?\d{2,3}\.\d{4,10}),(-?\d{1,2}\.\d{4,10})\]/);
+              if (pCoordMatch) {
+                let pLat = parseFloat(pCoordMatch[1]);
+                let pLng = parseFloat(pCoordMatch[2]);
+                if (pLat > 100 && pLng < 50) {
+                  const temp = pLat;
+                  pLat = pLng;
+                  pLng = temp;
+                }
+                lat = pLat;
+                lng = pLng;
+                matchSource = 'preview_place_api';
+              }
             }
           }
         } catch {
